@@ -71,10 +71,6 @@ jobs:
       - name: Build Pagefind search index
         run: npx --yes pagefind --site build/html --glob "c/**/*.html"
 
-      - name: Setup Pages
-        if: github.event_name != 'pull_request'
-        uses: actions/configure-pages@v5
-
       - name: Upload Pages artifact
         if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
