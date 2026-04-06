@@ -10,6 +10,7 @@ OUTPUT_FILENAME = book
 OUTPUT_FILENAME_HTML = index
 METADATA = book/metadata.yml
 CHAPTERS = $(filter-out book/chapters/README.md,$(wildcard book/chapters/*.md))
+CN_CHAPTERS = $(filter-out book/chapters/cn/README.md book/chapters/cn/CLAUDE.md,$(wildcard book/chapters/cn/*.md))
 TOC = --toc --toc-depth 3
 METADATA_ARGS = --metadata-file $(METADATA)
 IMAGES = $(shell find book/images -type f)
@@ -105,7 +106,7 @@ $(info JS files found: $(JS_FILES))
 
 epub:	$(BUILD)/epub/$(OUTPUT_FILENAME).epub
 
-html:	nested_html $(BUILD)/html/$(OUTPUT_FILENAME_HTML).html $(BUILD)/html/library.html $(BUILD)/html/course.html
+html:	nested_html nested_cn_html $(BUILD)/html/$(OUTPUT_FILENAME_HTML).html $(BUILD)/html/library.html $(BUILD)/html/course.html
 	
 pdf:	$(BUILD)/pdf/$(OUTPUT_FILENAME).pdf
 
@@ -153,6 +154,14 @@ $(BUILD)/html/$(OUTPUT_FILENAME_HTML).html:	$(HTML_DEPENDENCIES)
 	$(COPY_CMD) book/templates/copy-code.js $(BUILD)/html/c/
 	cp book/templates/view-source.js $(BUILD)/html/c/
 	$(COPY_CMD) book/templates/conversation.js $(BUILD)/html/c/
+	$(MKDIR_CMD) $(BUILD)/html/c/cn
+	$(COPY_CMD) book/templates/nav.js $(BUILD)/html/c/cn/
+	$(COPY_CMD) book/templates/header-anchors.js $(BUILD)/html/c/cn/
+	$(COPY_CMD) book/templates/table-scroll.js $(BUILD)/html/c/cn/
+	$(COPY_CMD) book/templates/citation-tooltips.js $(BUILD)/html/c/cn/
+	$(COPY_CMD) book/templates/copy-code.js $(BUILD)/html/c/cn/
+	cp book/templates/view-source.js $(BUILD)/html/c/cn/
+	$(COPY_CMD) book/templates/conversation.js $(BUILD)/html/c/cn/
 	cp book/templates/style.css $(BUILD)/html/style.css || echo "Failed to copy style.css"
 	@mkdir -p $(BUILD)/html/data
 	@test -f book/data/library.json && cp book/data/library.json $(BUILD)/html/data/library.json || echo "No library data to copy"
@@ -188,6 +197,18 @@ $(NESTED_HTML_DIR)/%.html: book/chapters/%.md $(HTML_DEPENDENCIES)
 # Aggregate target for nested chapter HTML files
 nested_html: $(CHAPTER_HTMLS)
 	@echo "All nested HTML files built"
+
+# CN (Chinese) chapter HTML build targets
+NESTED_CN_HTML_DIR = $(BUILD)/html/c/cn/
+CN_CHAPTER_HTMLS = $(patsubst book/chapters/cn/%.md,$(NESTED_CN_HTML_DIR)/%.html,$(CN_CHAPTERS))
+
+$(NESTED_CN_HTML_DIR)/%.html: book/chapters/cn/%.md $(HTML_DEPENDENCIES)
+	$(MKDIR_CMD) $(NESTED_CN_HTML_DIR)
+	$(PANDOC_COMMAND) $(ARGS) --template $(NESTED_HTML_TEMPLATE) --standalone --to html5 --resource-path=book -o $@ $< --mathjax
+	@echo "Built CN HTML for $<"
+
+nested_cn_html: $(CN_CHAPTER_HTMLS)
+	@echo "All CN nested HTML files built"
 
 # ArXiv‑compatible LaTeX build rule
 $(BUILD)/latex/$(OUTPUT_FILENAME).tex: $(PDF_DEPENDENCIES)
@@ -251,6 +272,9 @@ files:
 	cp $(BUILD)/epub/book.epub $(BUILD)/html/ || echo "Failed to copy EPUB to $(BUILD)/html/"
 	cp $(BUILD)/kindle/book.kindle.epub $(BUILD)/html/ || echo "Failed to copy Kindle EPUB to $(BUILD)/html/"
 	cp -r book/images $(BUILD)/html/c/ || echo "Failed to copy images to $(BUILD)/html/c/"
+	mkdir -p $(BUILD)/html/c/cn
+	cp book/favicon.ico $(BUILD)/html/c/cn/ || echo "Failed to copy favicon to $(BUILD)/html/c/cn/"
+	cp -r book/images $(BUILD)/html/c/cn/ || echo "Failed to copy images to $(BUILD)/html/c/cn/"
 	cp -r book/assets $(BUILD)/html/ || echo "Failed to copy assets to $(BUILD)/html/"
 	cp -r book/assets $(BUILD)/html/c/ || echo "Failed to copy assets to $(BUILD)/html/c/"
 	cp ./book/templates/nav.js $(BUILD)/html/ || echo "Failed to copy nav.js to $(BUILD)/html/"
