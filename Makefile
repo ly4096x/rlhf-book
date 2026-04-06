@@ -51,6 +51,7 @@ HTML_ARGS = --template book/templates/html.html --standalone --to html5 --listin
 PDF_ARGS = --template book/templates/pdf.tex --pdf-engine pdflatex
 LATEX_ARGS = --template book/templates/pdf.tex --pdf-engine pdflatex
 NESTED_HTML_TEMPLATE = book/templates/chapter.html
+NESTED_CN_HTML_TEMPLATE = book/templates/chapter-cn.html
 ARXIV_ZIP = $(BUILD)/arxiv.zip
 
 # Add this with your other file variables at the top
@@ -204,7 +205,7 @@ CN_CHAPTER_HTMLS = $(patsubst book/chapters/cn/%.md,$(NESTED_CN_HTML_DIR)/%.html
 
 $(NESTED_CN_HTML_DIR)/%.html: book/chapters/cn/%.md $(HTML_DEPENDENCIES)
 	$(MKDIR_CMD) $(NESTED_CN_HTML_DIR)
-	$(PANDOC_COMMAND) $(ARGS) --template $(NESTED_HTML_TEMPLATE) --standalone --to html5 --resource-path=book -o $@ $< --mathjax
+	$(PANDOC_COMMAND) $(ARGS) --template $(NESTED_CN_HTML_TEMPLATE) --standalone --to html5 --resource-path=book -o $@ $< --mathjax
 	@echo "Built CN HTML for $<"
 
 nested_cn_html: $(CN_CHAPTER_HTMLS)
