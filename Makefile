@@ -156,7 +156,7 @@ $(BUILD)/html/$(OUTPUT_FILENAME_HTML).html:	$(HTML_DEPENDENCIES)
 	cp book/templates/view-source.js $(BUILD)/html/c/
 	$(COPY_CMD) book/templates/conversation.js $(BUILD)/html/c/
 	$(MKDIR_CMD) $(BUILD)/html/c/cn
-	$(COPY_CMD) book/templates/nav.js $(BUILD)/html/c/cn/
+	$(COPY_CMD) book/templates/nav-cn.js $(BUILD)/html/c/cn/
 	$(COPY_CMD) book/templates/header-anchors.js $(BUILD)/html/c/cn/
 	$(COPY_CMD) book/templates/table-scroll.js $(BUILD)/html/c/cn/
 	$(COPY_CMD) book/templates/citation-tooltips.js $(BUILD)/html/c/cn/
