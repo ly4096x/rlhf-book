@@ -30,17 +30,10 @@ jobs:
 
       - name: Install pandoc-crossref
         run: |
-          CROSSREF_VERSION="0.3.18.1"
-          BASE_URL="https://github.com/lierdakil/pandoc-crossref/releases/download/v${CROSSREF_VERSION}"
-          # Try new naming convention first, then fall back to old
-          if curl -fsSL "${BASE_URL}/pandoc-crossref-Linux-X86-64.tar.xz" -o pandoc-crossref.tar.xz 2>/dev/null; then
-            echo "Downloaded Linux-X86-64 asset"
-          else
-            curl -fsSL "${BASE_URL}/pandoc-crossref-Linux.tar.xz" -o pandoc-crossref.tar.xz
-            echo "Downloaded Linux asset"
-          fi
+          CROSSREF_VERSION="0.3.20"
+          curl -fsSL "https://github.com/lierdakil/pandoc-crossref/releases/download/v${CROSSREF_VERSION}/pandoc-crossref-Linux-X64.tar.xz" \
+            -o pandoc-crossref.tar.xz
           tar -xf pandoc-crossref.tar.xz
-          # Binary may be at root or in a subdirectory
           BINARY=$(find . -name "pandoc-crossref" -type f | head -1)
           sudo mv "$BINARY" /usr/local/bin/pandoc-crossref
           pandoc-crossref --version
