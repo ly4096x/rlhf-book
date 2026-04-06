@@ -13,12 +13,12 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
-  cancel-in-progress: false
+  group: "pages-${{ github.ref }}"
+  cancel-in-progress: true
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,42 +28,26 @@ jobs:
         with:
           version: 3.7.0.2
 
-      - name: Prepare TeX Live cache directory
-        run: sudo mkdir -p /usr/local/texlive && sudo chown -R $(whoami) /usr/local/texlive
-
-      - name: Cache TeX Live
-        uses: actions/cache@v4
-        id: cache-texlive
-        with:
-          path: /usr/local/texlive
-          key: texlive-macos-${{ hashFiles('.github/workflows/static.yml') }}
-
-      - name: Install brew dependencies
+      - name: Install pandoc-crossref
         run: |
-          # brew update # (slow) uncomment this for minor version updates if needed to debug other issues
-          brew install make
-          brew install pandoc-crossref
-          brew install poppler
-          # Only install TeX if not cached
-          if [ "${{ steps.cache-texlive.outputs.cache-hit }}" != "true" ]; then
-            echo "Cache miss - installing TeX Live..."
-            brew install --cask basictex
-            eval "$(/usr/libexec/path_helper)"
-            sudo tlmgr update --self
-            # Install pdflatex packages (comes with basictex, but ensure dependencies)
-            sudo tlmgr install collection-fontsrecommended collection-latexextra standalone
-          else
-            echo "Cache hit - skipping TeX Live installation"
-          fi
+          CROSSREF_VERSION="0.3.18.1"
+          curl -L "https://github.com/lierdakil/pandoc-crossref/releases/download/v${CROSSREF_VERSION}/pandoc-crossref-Linux.tar.xz" \
+            -o pandoc-crossref.tar.xz
+          tar -xf pandoc-crossref.tar.xz
+          sudo mv pandoc-crossref /usr/local/bin/
+          pandoc-crossref --version
 
-      - name: Set up LaTeX PATH
+      - name: Install system dependencies
         run: |
-          # Find the actual texlive bin directory (varies by year/arch)
-          TEXLIVE_BIN=$(find /usr/local/texlive -type d -name "bin" -exec find {} -type d -name "*-darwin" \; 2>/dev/null | head -1)
-          echo "Found TeX Live bin: $TEXLIVE_BIN"
-          echo "$TEXLIVE_BIN" >> $GITHUB_PATH
-          # Also add the standard symlink path in case it exists
-          echo "/Library/TeX/texbin" >> $GITHUB_PATH
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            make \
+            poppler-utils \
+            texlive-latex-extra \
+            texlive-fonts-extra \
+            texlive-fonts-recommended \
+            texlive-xetex \
+            lmodern
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v4
