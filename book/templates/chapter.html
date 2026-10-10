@@ -2,19 +2,41 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="$lang$" xml:lang="$lang$"$if(dir)$ dir="$dir$"$endif$>
 <head>
   <meta charset="utf-8" />
+  <!-- Set the theme before first paint to avoid a flash of the wrong theme. -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('theme');
+        if (t !== 'light' && t !== 'dark') {
+          t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
   <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+  <link rel="canonical" href="$if(canonical-url)$$canonical-url$$else$https://rlhfbook.com/$endif$" />
+  <meta name="description" content="$if(meta-description)$$meta-description$$else$A chapter from the RLHF Book, a free guide to reinforcement learning from human feedback and post-training language models.$endif$" />
 
   <!-- Add Open Graph meta tags for share image -->
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="RLHF Book" />
   <meta property="og:image" content="https://rlhfbook.com/assets/rlhf-book-share.png" />
   <meta property="og:image:width" content="1920" />
   <meta property="og:image:height" content="1080" />
   
   <!-- <meta property="og:title" content="$if(title-prefix)$$title-prefix$ – $endif$$pagetitle$" /> -->
-  <meta property="og:title" content="$if(page-title)$$page-title$$else$$title$$endif$ | RLHF Book by Nathan Lambert" />
-  <meta property="og:description" content="The Reinforcement Learning from Human Feedback Book" />
-  <meta property="og:url" content="https://rlhfbook.com" />
+  <meta property="og:title" content="$if(page-title)$$page-title$$else$$title$$endif$ | RLHF and Post-Training Book by Nathan Lambert" />
+  <meta property="og:description" content="$if(meta-description)$$meta-description$$else$A chapter from the RLHF Book, a free guide to reinforcement learning from human feedback and post-training language models.$endif$" />
+  <meta property="og:url" content="$if(canonical-url)$$canonical-url$$else$https://rlhfbook.com/$endif$" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="$if(page-title)$$page-title$$else$$title$$endif$ | RLHF and Post-Training Book by Nathan Lambert" />
+  <meta name="twitter:description" content="$if(meta-description)$$meta-description$$else$A chapter from the RLHF Book, a free guide to reinforcement learning from human feedback and post-training language models.$endif$" />
+  <meta name="twitter:image" content="https://rlhfbook.com/assets/rlhf-book-share.png" />
 
   $for(author-meta)$
   <meta name="author" content="$author-meta$" />
@@ -27,13 +49,14 @@ $if(keywords)$
 $endif$
   <!-- <title>RLHF Book</title> -->
    <!-- SEO and Open Graph titles -->
-   <title>
-    $if(page-title)$
-      $page-title$ | RLHF Book by Nathan Lambert
-    $else$
-      $title$ | RLHF Book by Nathan Lambert
-    $endif$
-  </title>
+   <title>$if(page-title)$$page-title$$else$$title$$endif$ | RLHF and Post-Training Book by Nathan Lambert</title>
+
+  <script type="application/ld+json">
+$chapter-jsonld$
+  </script>
+  <script type="application/ld+json">
+$breadcrumb-jsonld$
+  </script>
   
   <style>
     $styles.html()$
@@ -91,6 +114,7 @@ $endfor$
 <script src="copy-code.js" defer></script>
 <script src="view-source.js" defer></script>
 <script src="conversation.js" defer></script>
+<script src="theme.js" defer></script>
 <style>
   .toc-lecture-link {
     margin-top: 0.3em;
@@ -109,6 +133,10 @@ $endfor$
 
 </head>
 <body>
+<button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to dark mode" title="Switch to dark mode" aria-pressed="false">
+  <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+  <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+</button>
 $for(include-before)$
 $include-before$
 $endfor$
@@ -134,22 +162,34 @@ $endif$
 $table-of-contents$
 </nav>
 $endif$
-$if(lecture-video)$
-<li class="toc-lecture-link" id="toc-lecture-link" hidden>
-  <a href="$lecture-video$" target="_blank" rel="noopener">
+$for(lectures)$
+$if(lectures.video)$
+<li class="toc-lecture-link toc-lecture-link-item" hidden>
+  <a href="$lectures.video$" target="_blank" rel="noopener">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: -2px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-    $lecture-label$
+    $lectures.label$
   </a>
 </li>
+$else$
+<li class="toc-lecture-link toc-lecture-link-item" hidden>
+  <span style="color: #aaa;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: -2px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+    $lectures.label$
+  </span>
+</li>
+$endif$
+$endfor$
+$if(lectures)$
 <script>
   document.addEventListener('DOMContentLoaded', function() {
     var toc = document.getElementById('TOC');
-    var li = document.getElementById('toc-lecture-link');
-    if (!toc || !li) return;
+    if (!toc) return;
     var topUl = toc.querySelector('ul');
     if (!topUl) return;
-    topUl.appendChild(li);
-    li.hidden = false;
+    document.querySelectorAll('.toc-lecture-link-item').forEach(function(li) {
+      topUl.appendChild(li);
+      li.hidden = false;
+    });
   });
 </script>
 $endif$
@@ -178,27 +218,26 @@ $endfor$
 <section id="citation" style="padding: 0 20px;">
   <h4 style="text-align: left; font-weight: normal;">Citation</h4>
   <p>If you found this useful for your research, please cite it!</p>
-  <pre style="text-align: left; font-size: small; color: #888;">@book{rlhf2026lambert,
-  author = {Nathan Lambert},
+  <p>For the web and arXiv version:</p>
+  <pre style="text-align: left; font-size: small; color: #888;">@misc{lambert2025reinforcementlearninghumanfeedback,
   title = {Reinforcement Learning from Human Feedback},
+  author = {Nathan Lambert},
+  year = {2025},
+  eprint = {2504.12501},
+  archivePrefix = {arXiv},
+  primaryClass = {cs.LG},
+  url = {https://arxiv.org/abs/2504.12501}
+}</pre>
+  <p>For the Manning edition:</p>
+  <pre style="text-align: left; font-size: small; color: #888;">@book{lambert2026reinforcement,
+  author = {Nathan Lambert},
+  title = {Reinforcement Learning from Human Feedback: Alignment and post-training of {LLMs}},
   year = {2026},
-  publisher = {Online},
-  url = {https://rlhfbook.com}
+  publisher = {Manning Publications},
+  isbn = {9781633434301},
+  url = {https://www.manning.com/books/reinforcement-learning-from-human-feedback}
 }</pre>
 </section>
-<footer style="padding: 20px; text-align: center; margin-top: 2em;">
-  <div style="display: flex; justify-content: center; gap: 20px; align-items: center;">
-    <a href="https://github.com/natolambert/rlhf-book" target="_blank">
-      <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" alt="GitHub" style="width: 40px; height: 40px;">
-    </a>
-    <a href="https://arxiv.org/abs/2504.12501" target="_blank">
-      <img src="assets/arxiv.svg" alt="arXiv" style="width: 40px; height: 40px;">
-    </a>
-    <a href="https://www.manning.com/books/the-rlhf-book" target="_blank">
-      <img src="assets/manning.svg" alt="Manning" style="width: 40px; height: 40px;">
-    </a>
-  </div>
-  <p>&copy; 2024-2026 Nathan Lambert &middot; <a href="https://rlhfbook.com" style="color: #888; text-decoration: none;">rlhfbook.com</a></p>
-</footer>
+$footer.html()$
 </body>
 </html>

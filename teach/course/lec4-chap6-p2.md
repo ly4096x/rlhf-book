@@ -7,7 +7,7 @@ fonts:
 bibliography: refs.bib
 figure_captions: true
 footer:
-  left: "rlhfbook.com"
+  left: "rlhfbook.com/course"
   center: "Lecture 4"
   right: "Lambert {n}/{N}"
 custom_css: |
@@ -32,7 +32,7 @@ custom_css: |
 <p class="colloquium-title-name">Nathan Lambert</p>
 </div>
 
-<p class="colloquium-title-note">Course on RLHF and post-training. Chapter 6, Part 2</p>
+<p class="colloquium-title-note">Post-training course. Chapter 6, Part 2</p>
 
 ---
 
@@ -47,35 +47,35 @@ tone: muted
 compact: true
 content: |
   1. Introduction
-  2. Key Related Works
-  3. Training Overview
+  2. Key related works
+  3. Training overview
 ```
 
 |||
 
 ```box
-title: Core Training Pipeline
+title: Core training pipeline
 tone: accent
 compact: true
 content: |
-  4. Instruction Tuning
-  5. Reward Models
-  6. **Reinforcement Learning**
+  4. Instruction tuning
+  5. Reward models
+  6. **Reinforcement learning**
   7. Reasoning
-  8. Direct Alignment
-  9. Rejection Sampling
+  8. Direct alignment
+  9. Rejection sampling
 ```
 
 |||
 
 ```box
-title: Data & Preferences
+title: Data & preferences
 tone: muted
 compact: true
 content: |
-  10. What are Preferences
-  11. Preference Data
-  12. Synthetic Data & CAI
+  10. What are preferences
+  11. Preference data
+  12. Synthetic data & CAI
 ```
 
 ===
@@ -83,15 +83,15 @@ content: |
 <!-- row-columns: 32/36/32 -->
 
 ```box
-title: Practical Considerations
+title: Practical considerations
 tone: muted
 compact: true
 content: |
-  13. Tool Use
+  13. Tool use
   14. Over-optimization
   15. Regularization
   16. Evaluation
-  17. Product & Character
+  17. Product & character
 ```
 
 |||
@@ -102,14 +102,14 @@ tone: surface
 compact: true
 content: |
   - A. Definitions
-  - B. Style & Information
-  - C. Practical Issues
+  - B. Style & information
+  - C. Practical issues
 ```
 
 |||
 
 ```box
-title: Course Home
+title: Course home
 tone: surface
 compact: true
 content: |
@@ -144,16 +144,15 @@ The hardest bugs aren't math errors — they're silent implementation mistakes: 
 ## What this lecture covers
 
 ```box
-title: Lecture 4 Outline
+title: Lecture 4 outline
 tone: accent
 content: |
-  1. **Policy gradient code** — log-probs, REINFORCE loss, RLOO vs GRPO
-  2. **Loss aggregation** — per-sequence, per-token, fixed-length normalization
-  3. **PPO implementation** — GAE, clipped loss, value function, full loop
-  4. **GRPO implementation** — simplified code, memory comparison
-  5. **Async training & infrastructure** — on/off-policy, distributed systems
-  6. **Practical engineering** — compute costs, debugging, recipes
-  7. **Exploring real training** — codebases, WandB, debugging checklist
+  1. **Policy gradient code** — log-probs, the REINFORCE loss, RLOO baseline
+  2. **PPO implementation** — GAE, clipped loss, value function, minibatches, debugging
+  3. **GRPO & friends** — simplified code, comparison to PPO, GSPO & CISPO
+  4. **Loss aggregation** — per-sequence, per-token, fixed-length normalization trade-offs
+  5. **Training infrastructure** — on/off-policy, synchronous vs async systems
+  6. **Practical considerations** — numerical stability, what to monitor, open codebases
 ```
 
 ---
@@ -164,21 +163,21 @@ content: |
 
 ---
 
-## Recall: the policy gradient
+## Recall: The policy gradient
 
 The objective and its gradient:
 
-$$J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}[R(\tau)]$$
+$$J(\theta) = \mathbb{E}_{\tau \sim p_\theta}[R(\tau)]$$
 
-$$\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}\!\left[\sum_{t=0}^{T} \nabla_\theta \log \pi_\theta(a_t \mid s_t) \cdot \Psi_t\right]$$
+$$\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim p_\theta}\!\left[\sum_{t=0}^{T} \Psi_t \nabla_\theta \log \pi_\theta(a_t \mid s_t)\right]$$
 
 The gradient says: for each token, compute the direction that makes it more likely ($\nabla \log \pi$), then scale by how good it was ($\Psi_t$).
 
 ---
 
-## Recall: the policy gradient algorithms
+## Recall: The policy gradient algorithms
 
-All methods optimize the same core objective — they differ in $\Psi_t$ and how updates are bounded:
+All methods minimize the same family of **losses** (note the leading minus signs) — they differ in $\Psi_t$ and how updates are bounded:
 
 <div class="text-sm">
 
@@ -193,11 +192,11 @@ $$\begin{aligned}
 
 Where $\rho_t = \frac{\pi_\theta(a_t \mid s_t)}{\pi_{\theta_\text{old}}(a_t \mid s_t)}$ is the importance-sampling ratio. PPO: per-token advantage $A_t$ via GAE. GRPO: per-token ratio $\rho_{i,t}$ but sequence-level advantage $\hat{A}_i = \frac{R_i - \mu}{\sigma}$.
 
-*(Reductions shown are schematic — aggregation strategy is a key design choice, covered later.)*
+
 
 ---
 
-## Recall: why losses are sums of log-probs
+## Recall: Why losses are sums of log-probs
 
 From lecture 3, the policy gradient derivation showed:
 
@@ -208,7 +207,7 @@ In code, we compute the **log-probs** and let autodiff handle the gradient:
 ```python
 seq_log_probs = (token_log_probs * completion_mask).sum(dim=-1)
 loss = -(seq_log_probs * advantages).mean()
-loss.backward()  # autodiff gives ∑ ∇ log π · Ψ_t
+loss.backward()  # autodiff gives ∑ Ψ_t ∇ log π
 ```
 
 Every loss function in this lecture is a variation on this pattern.
@@ -284,15 +283,15 @@ That's it. Advantages weight the log-probabilities. Positive advantage → incre
 Generate $K$ completions per prompt, compute leave-one-out baselines:
 
 ```python
-# rlhf_reward: (N*K,) flat tensor of rewards
+# rlhf_reward: (B*K,) flat tensor of rewards
 # Prompt-major layout: K sibling completions stay together
-rlhf_reward = rlhf_reward.view(-1, rloo_k)  # (N, K)
+rlhf_reward = rlhf_reward.view(-1, rloo_k)  # (B, K)
 
 # Leave-one-out baseline: avg of other K-1 rewards per prompt
 baseline = (rlhf_reward.sum(dim=1, keepdim=True) - rlhf_reward) / (rloo_k - 1)
 
-advantages = rlhf_reward - baseline        # (N, K)
-advantages = advantages.reshape(-1)        # (N*K,)
+advantages = rlhf_reward - baseline        # (B, K)
+advantages = advantages.reshape(-1)        # (B*K,)
 ```
 
 The rest follows standard policy gradient — multiply advantages by log-probs. 
@@ -303,13 +302,13 @@ Note: the data loader must generate $K$ completions per prompt and group them to
 
 <!-- layout: section-break -->
 
-## Proximal Policy Optimization (PPO)
+## Proximal policy optimization (PPO)
 
 ---
 
-## Recall: Proximal Policy Optimization (PPO)
+## Recall: Proximal policy optimization (PPO)
 
-The clipped surrogate objective:
+The clipped surrogate loss (minimized):
 
 $$L^{\text{CLIP}}(\theta) = -\mathbb{E}_t\!\left[\min\!\Big(\rho_t A_t,\; \text{clip}(\rho_t, 1-\varepsilon, 1+\varepsilon)\, A_t\Big)\right]$$
 
@@ -651,24 +650,13 @@ For a 7B model with fp16:
 
 ---
 
-## Double regularization
-
-PPO has **both** clipping **and** KL penalty. Not redundant:
-
-- **Clipping** = per-step size constraint (trust region). Prevents catastrophic single updates
-- **KL penalty** = total drift constraint. Prevents cumulative drift from the reference over many steps
-
-In practice, with $K = 1$ and no minibatching, $\pi_\theta = \pi_{\theta_\text{old}}$ so clipping never activates. But with minibatching (common at scale), later minibatches see an updated $\pi_\theta$, so clipping can still trigger even at $K = 1$.
-
----
-
 <!-- layout: section-break -->
 
-## Group Relative Policy Optimization (GRPO) & Friends
+## Group relative policy optimization (GRPO) & friends
 
 ---
 
-## Recall: Group Relative Policy Optimization (GRPO)
+## Recall: Group relative policy optimization (GRPO)
 
 <!-- cite-right: shao2024deepseekmath -->
 
@@ -676,7 +664,7 @@ For each prompt, sample $G$ completions and compute group-normalized advantages:
 
 $$\hat{A}_i = \frac{R_i - \mu_G}{\sigma_G}, \qquad \mu_G = \frac{1}{G}\sum_{j=1}^{G} R_j, \quad \sigma_G = \sqrt{\frac{1}{G}\sum_{j=1}^{G}(R_j - \mu_G)^2}$$
 
-Then apply the same clipped objective as PPO — per-token ratios but sequence-level advantages — plus an optional KL penalty in the loss (more in the reasoning lecture):
+Then apply the same clipped loss as PPO (minimized) — per-token ratios but sequence-level advantages — plus an optional KL penalty (more in the reasoning lecture):
 
 $$L^{\text{GRPO}}(\theta) = -\frac{1}{G}\sum_{i=1}^{G}\frac{1}{|a_i|}\sum_{t=1}^{|a_i|}\min\!\Big(\rho_{i,t} \hat{A}_i,\; \text{clip}(\rho_{i,t}, 1-\varepsilon, 1+\varepsilon)\, \hat{A}_i\Big) + \beta \, \text{KL}(\pi_\theta \| \pi_\text{ref})$$
 
@@ -793,7 +781,7 @@ Same structure, different baseline computation. GRPO adds std normalization; RLO
 
 ---
 
-## Recent simplifications: GSPO & CISPO
+## Recent advancements: GSPO & CISPO
 
 <!-- columns: 50/50 -->
 
@@ -819,13 +807,13 @@ Detach the clipped ratio so gradients flow only through $\log \pi_\theta$. The r
 
 <div class="text-sm">
 
-**GSPO** — sequence-level ratio:
+**GSPO** [@zheng2025gspo] — sequence-level ratio, GRPO style algorithm:
 ```python
 log_ratio = (new_logps - old_logps) * mask
-rho = torch.exp(
-    log_ratio.sum(dim=1) / mask.sum(dim=1)
-)  # (B*G,) — one ratio per sequence
-# Same clipping, but per-sequence
+rho = torch.exp(log_ratio.sum(dim=1) / mask.sum(dim=1))  # (B*G,)
+# Same clipped loss as GRPO, but per-sequence
+rho_clipped = rho.clamp(1 - eps, 1 + eps)
+loss = -torch.min(rho * advantages, rho_clipped * advantages).mean()
 ```
 
 </div>
@@ -834,15 +822,11 @@ rho = torch.exp(
 
 <div class="text-sm">
 
-**CISPO** — stop-gradient on clipped ratio:
+**CISPO** [@minimax2025minimaxm1scalingtesttimecompute] — stop-gradient on clipped ratio, REINFORCE style algorithm:
 ```python
 rho = torch.exp(new_logps - old_logps)
-rho_clipped = torch.clamp(
-    rho, 1 - eps, 1 + eps
-).detach()  # no grad through ratio
-loss = -(rho_clipped * advantages.unsqueeze(1)
-         * new_logps * mask).sum()
-       / mask.sum()
+rho_clipped = torch.clamp(rho, 1 - eps, 1 + eps).detach()  # no grad through ratio
+loss = -(rho_clipped * advantages.unsqueeze(1) * new_logps * mask).sum() / mask.sum()
 ```
 
 </div>
@@ -896,9 +880,17 @@ A process management library (e.g., Ray) coordinates data flow between them. Mod
 
 ---
 
+## More resources on RL implementations
+
+- A [video](https://www.youtube.com/watch?v=amrJDwMUFNs) I recorded looking at codebases implementing GRPO, DAPO, Dr. GRPO, and other papers.
+- ~24min in, [talk](https://youtu.be/uaZ3yRdYg8A?si=iSGw56BFNQMWNjtr&t=1487) on scaling RL for Olmo 3.
+- Finbarr Timbers's [blog post](https://finbarr.ca/making-rl-fast/) on making RL fast.
+
+---
+
 ## Open-source RL codebases
 
-- **TRL** [@vonwerra2022trl] — HuggingFace ecosystem, PPO/GRPO/DPO. Best starting point for getting started
+- **TRL** [@vonwerra2022trl] — Hugging Face ecosystem, PPO/GRPO/DPO. Best starting point for getting started
 - **Open Instruct** [@ivison2024unpacking] — Allen AI, multi-algorithm. Best for research and reproduction
 - **veRL** — Very popular in the RLVR era.
 - **OpenRLHF** — Started for RLHF work, popular with RLVR, etc. too.
@@ -1075,7 +1067,7 @@ seq_2_losses = [1, 1, 1, 1, 1, 1, 1, 1, 1, 10]  # 10 tokens, mean = 1.9
 
 Illustrative ranges — thresholds vary by model size, task, and algorithm:
 
-| WandB panel | Healthy | Unhealthy |
+| W&B panel | Healthy | Unhealthy |
 |-------------|---------|-----------|
 | `reward/mean` | Steady upward trend | Spikes, oscillation, plateau |
 | `kl/mean` | Gradual increase (0 → 2–5) | Explosion (>10) or flat at 0 |
@@ -1140,7 +1132,7 @@ From math to running code — the implementation details that matter:
 <!-- row-columns: 50/50 -->
 
 ```box
-title: Book & Course
+title: Book & course
 tone: accent
 compact: true
 content: |
@@ -1156,7 +1148,7 @@ title: Codebases
 tone: surface
 compact: true
 content: |
-  - [TRL](https://github.com/huggingface/trl) — HuggingFace
+  - [TRL](https://github.com/huggingface/trl) — Hugging Face
   - [Open Instruct](https://github.com/allenai/open-instruct) — Allen AI
   - [veRL](https://github.com/volcengine/verl) — ByteDance
   - [OpenRLHF](https://github.com/OpenRLHF/OpenRLHF)
@@ -1167,7 +1159,7 @@ content: |
 <!-- row-columns: 50/50 -->
 
 ```box
-title: Key Papers
+title: Key papers
 tone: surface
 compact: true
 content: |
@@ -1180,7 +1172,7 @@ content: |
 |||
 
 ```box
-title: Further Reading
+title: Further reading
 tone: surface
 compact: true
 content: |
@@ -1192,7 +1184,7 @@ content: |
 ---
 
 <!-- rows: 50/50 -->
-## What's next: DAAs & Reasoning
+## What's next: DAAs & reasoning
 
 <!-- row-columns: 32/36/32 -->
 
@@ -1202,35 +1194,35 @@ tone: muted
 compact: true
 content: |
   1. Introduction
-  2. Key Related Works
-  3. Training Overview
+  2. Key related works
+  3. Training overview
 ```
 
 |||
 
 ```box
-title: Core Training Pipeline
+title: Core training pipeline
 tone: accent
 compact: true
 content: |
-  4. Instruction Tuning
-  5. Reward Models
-  6. **Reinforcement Learning**
+  4. Instruction tuning
+  5. Reward models
+  6. **Reinforcement learning**
   7. Reasoning
-  8. Direct Alignment
-  9. Rejection Sampling
+  8. Direct alignment
+  9. Rejection sampling
 ```
 
 |||
 
 ```box
-title: Data & Preferences
+title: Data & preferences
 tone: muted
 compact: true
 content: |
-  10. What are Preferences
-  11. Preference Data
-  12. Synthetic Data & CAI
+  10. What are preferences
+  11. Preference data
+  12. Synthetic data & CAI
 ```
 
 ===
@@ -1238,15 +1230,15 @@ content: |
 <!-- row-columns: 32/36/32 -->
 
 ```box
-title: Practical Considerations
+title: Practical considerations
 tone: muted
 compact: true
 content: |
-  13. Tool Use
+  13. Tool use
   14. Over-optimization
   15. Regularization
   16. Evaluation
-  17. Product & Character
+  17. Product & character
 ```
 
 |||
@@ -1257,14 +1249,14 @@ tone: surface
 compact: true
 content: |
   - A. Definitions
-  - B. Style & Information
-  - C. Practical Issues
+  - B. Style & information
+  - C. Practical issues
 ```
 
 |||
 
 ```box
-title: Course Home
+title: Course home
 tone: surface
 compact: true
 content: |
@@ -1276,12 +1268,12 @@ content: |
 
 ## Course outline
 
-1. **Introduction & Training Overview** — Chapters 1–3
-2. **Instruction Tuning, Reward Models, Rejection Sampling** — Chapters 4, 5, 9
-3. **RL Theory** — Chapter 6 (Part 1)
-4. **RL Implementation & Practice** — Chapter 6 (Part 2)
+1. **Introduction & training overview** — Chapters 1–3
+2. **Instruction tuning, reward models, rejection sampling** — Chapters 4, 5, 9
+3. **RL theory** — Chapter 6 (Part 1)
+4. **RL implementation & practice** — Chapter 6 (Part 2)
 5. **Reasoning** — Chapter 7
-6. **Direct Alignment Algorithms** — Chapter 8
+6. **Direct alignment algorithms** — Chapter 8
 7. ...
 
 ---

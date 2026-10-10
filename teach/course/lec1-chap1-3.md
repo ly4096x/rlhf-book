@@ -7,7 +7,7 @@ fonts:
 bibliography: refs.bib
 figure_captions: true
 footer:
-  left: "rlhfbook.com"
+  left: "rlhfbook.com/course"
   center: "Lecture 1"
   right: "Lambert {n}/{N}"
 custom_css: |
@@ -32,7 +32,7 @@ custom_css: |
 <p class="colloquium-title-name">Nathan Lambert</p>
 </div>
 
-<p class="colloquium-title-note">Course on RLHF and post-training. Chapters 1-3</p>
+<p class="colloquium-title-note">Post-training course. Chapters 1-3</p>
 
 ---
 
@@ -106,12 +106,12 @@ Modern language models:
 ---
 
 <!-- columns: 45/55 -->
-## 2020: GPT-3 surprising capabilities
+## 2020: GPT-3's surprising capabilities
 
 - 2017: the Transformer is born
 - 2018: GPT-1, ELMo, and BERT released
 - 2019: GPT-2 and scaling laws
-- **2020:** GPT-3 surprising capabilities
+- **2020:** GPT-3's surprising capabilities
 
 |||
 
@@ -126,7 +126,7 @@ Modern language models:
 - 2017: the Transformer is born
 - 2018: GPT-1, ELMo, and BERT released
 - 2019: GPT-2 and scaling laws
-- 2020: GPT-3 surprising capabilities
+- 2020: GPT-3's surprising capabilities
 - **2021:** Stochastic Parrots
 
 |||
@@ -142,7 +142,7 @@ Modern language models:
 - 2017: the Transformer is born
 - 2018: GPT-1, ELMo, and BERT released
 - 2019: GPT-2 and scaling laws
-- 2020: GPT-3 surprising capabilities
+- 2020: GPT-3's surprising capabilities
 - 2021: Stochastic Parrots
 - **2022:** ChatGPT
 
@@ -159,14 +159,14 @@ Modern language models:
 - 2017: the Transformer is born
 - 2018: GPT-1, ELMo, and BERT released
 - 2019: GPT-2 and scaling laws
-- 2020: GPT-3 surprising capabilities
+- 2020: GPT-3's surprising capabilities
 - 2021: Stochastic Parrots
 - 2022: ChatGPT
 - **2023:** GPT-4 and frontier-scale
 
 |||
 
-![An image where Nvidia CEO Jensen Huang supposedly leaked that GPT-4 was an ~2T parameter MoE model.](assets/jensen-gpt4.jpeg)
+![An image where NVIDIA CEO Jensen Huang supposedly leaked that GPT-4 was a roughly 2T-parameter MoE model.](assets/jensen-gpt4.jpeg)
 <!-- cite-right: openai2023gpt4 -->
 
 ---
@@ -177,7 +177,7 @@ Modern language models:
 - 2017: the Transformer is born
 - 2018: GPT-1, ELMo, and BERT released
 - 2019: GPT-2 and scaling laws
-- 2020: GPT-3 surprising capabilities
+- 2020: GPT-3's surprising capabilities
 - 2021: Stochastic Parrots
 - 2022: ChatGPT
 - 2023: GPT-4 and frontier-scale
@@ -196,7 +196,7 @@ Modern language models:
 - 2017: the Transformer is born
 - 2018: GPT-1, ELMo, and BERT released
 - 2019: GPT-2 and scaling laws
-- 2020: GPT-3 surprising capabilities
+- 2020: GPT-3's surprising capabilities
 - 2021: Stochastic Parrots
 - 2022: ChatGPT
 - 2023: GPT-4 and frontier-scale
@@ -293,7 +293,7 @@ What this means for post-training:
 
 Model responses evolved quickly to have:
 - Better **format**: direct, conversational answers
-- Better **style**: helpful, concise, markdown, etc.
+- Better **style**: helpful, concise, Markdown, etc.
 - Better **product**: people could actually use it every day
 
 |||
@@ -590,7 +590,6 @@ $$J(\pi) = \mathbb{E}\left[ r_\theta(x, y) \right] - \beta \, D_{\text{KL}}\!\le
 
 ---
 
-<!-- valign: center -->
 <!-- cite-right: ouyang2022training -->
 
 ## InstructGPT's 3-step RLHF recipe
@@ -676,7 +675,7 @@ Notation:
 ## Step 2/3: Reward modeling
 
 ```box
-title: Core Idea
+title: Core idea
 tone: accent
 content: |
   The reward used in RLHF is the model predicting the probability that a given piece of text would be the "winning" or "chosen" completion in a pair/batch. Clever!
@@ -861,7 +860,7 @@ Generate many completions, score them, fine-tune on the best:
 3. **Select**: keep the highest-scoring completion(s)
 4. **Fine-tune**: standard SFT loss on the curated set
 
-$$\mathcal{L}_{\mathrm{RS}} = \mathcal{L}_{\mathrm{SFT}}\!\left(\theta;\; \{(x_i, y_i^{\star})\}\right) \quad \text{where } y_i^{\star} = \arg\max_{j} r_\phi(x_i, y_{i,j})$$
+$$\mathcal{L}_{\mathrm{RS}} = \mathcal{L}_{\mathrm{SFT}}\!\left(\theta;\; \{(x_i, y_i^{\star})\}\right) \quad \text{where } y_i^{\star} = y_{i,\, \arg\max_{j} r_\phi(x_i, y_{i,j})}$$
 
 Simple, stable, and widely used: Llama 2 [@touvron2023llama] and DeepSeek R1 [@guo2025deepseek] both include rejection sampling stages.
 
@@ -897,7 +896,6 @@ The KL penalty $\beta$ is the main defense — it limits how far the policy can 
 
 ---
 
-<!-- valign: center -->
 ## How training recipes have evolved
 
 | | InstructGPT (2022) | Tülu 3 (2024) | DeepSeek R1 (2025) |
@@ -1200,35 +1198,35 @@ tone: accent
 compact: true
 content: |
   1. Introduction
-  2. Key Related Works
-  3. Training Overview
+  2. Key related works
+  3. Training overview
 ```
 
 |||
 
 ```box
-title: Core Training Pipeline
+title: Core training pipeline
 tone: muted
 compact: true
 content: |
-  4. Instruction Tuning
-  5. Reward Models
-  6. Reinforcement Learning
+  4. Instruction tuning
+  5. Reward models
+  6. Reinforcement learning
   7. Reasoning
-  8. Direct Alignment
-  9. Rejection Sampling
+  8. Direct alignment
+  9. Rejection sampling
 ```
 
 |||
 
 ```box
-title: Data & Preferences
+title: Data & preferences
 tone: muted
 compact: true
 content: |
-  10. What are Preferences
-  11. Preference Data
-  12. Synthetic Data & CAI
+  10. What are preferences
+  11. Preference data
+  12. Synthetic data & CAI
 ```
 
 ===
@@ -1236,15 +1234,15 @@ content: |
 <!-- row-columns: 34/33/33 -->
 
 ```box
-title: Practical Considerations
+title: Practical considerations
 tone: muted
 compact: true
 content: |
-  13. Tool Use
+  13. Tool use
   14. Over-optimization
   15. Regularization
   16. Evaluation
-  17. Product & Character
+  17. Product & character
 ```
 
 |||
@@ -1255,14 +1253,14 @@ tone: surface
 compact: true
 content: |
   - A. Definitions  
-  - B. Style & Information  
-  - C. Practical Issues  
+  - B. Style & information  
+  - C. Practical issues  
 ```
 
 |||
 
 ```box
-title: Course Home
+title: Course home
 tone: surface
 compact: true
 content: |

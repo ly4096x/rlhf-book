@@ -5,29 +5,40 @@
   Full license: https://github.com/natolambert/rlhf-book/blob/main/LICENSE-CHAPTERS
 -->
 ---
-prev-chapter: "Synthetic Data & CAI"
+prev-chapter: "Synthetic Data & Distillation"
 prev-url: "12-synthetic-data"
-page-title: Tool Use
-search-title: "Chapter 13: Tool Use"
-next-chapter: "Over-optimization"
+page-title: Tool Use and Function Calling
+search-title: "Chapter 13: Tool Use and Function Calling"
+meta-description: "Tool use and function calling as post-training targets for building more capable language model products and agents."
+next-chapter: "Over-Optimization"
 next-url: "14-over-optimization"
+lectures:
+  - video: "https://www.youtube.com/watch?v=GMry2DzC304&list=PLL1tdVxB1CpVpEtMHxwuR4uI4Lxjw00_y&index=17"
+    label: "Lecture 11: Tool Use, Function Calling and The Road to Agents"
 ---
 
-# Tool Use & Function Calling
+# Tool Use and Function Calling
 
 Language models using tools is a natural way to expand their capabilities, especially for high-precision tasks where external tools contain the information or for agents that need to interact with complex web systems.
-Tool-use is a skill that language models need to be trained to have, where RLHF and all the other methods presented in this book can refine it.
+Tool-use is a skill that language models need to be trained to have, and RLHF and all the other methods presented in this book can refine it.
 Consider a question from a user such as:
 
 > **User**: Who is the president today?
 
 A language model without tools will have a hard time answering this question due to the knowledge cutoff of pretraining data, but this is readily accessible information with one search query.
+Consider another example:
+
+> **User**: Move all the arXiv papers in my downloads folder to my ~/research/ directory with names indicating the date of the paper.
+
+This is a task that the model weights alone cannot even attempt -- the use of tools enables language models to address a far broader range of tasks.
 
 Before diving deeper, it is useful to distinguish related terms that are often used interchangeably:
 
 - **Tool use**: the model emits a structured request (tool name and arguments); an orchestrator executes the tool; results are appended to the context; the model continues generating.
 - **Function calling**: tool use where the arguments must conform to a declared schema for a set of functions (usually JSON Schema), enabling reliable parsing and validation.
 - **Code execution**: a special case of tool use where the "tool" is a code interpreter (e.g., Python); results are returned as tool output.
+
+## Tool-Use Overview
 
 An AI model uses any external tools by outputting special tokens to trigger a certain endpoint. 
 These can be anything from highly specific tools, such as functions that return the weather at a specific place, to code interpreters or search engines that act as fundamental building blocks of complex behaviors.
@@ -62,15 +73,15 @@ print(str(compute_pi())[:52])
 
 This chapter provides an overview of the origins of tool-use in modern language models, its fundamentals and formatting, and current trade-offs in utilizing tools well in leading models.
 
-The exact origin of the term "tool use" is not clear, but the origins of the idea far predate the post ChatGPT world where RLHF proliferated.
+The exact origin of the term "tool use" is not clear, but the origins of the idea far predate the post-ChatGPT world where RLHF proliferated.
 Early examples circa 2015 attempted to build systems predating modern language models, such as Neural Programmer-Interpreters (NPI) [@reed2015neural], "a recurrent and compositional neural network that learns to represent and execute programs."
 As language models became more popular, many subfields were using integrations with external capabilities to boost performance. 
 To obtain information outside of just the weights many used retrieval augmented generation [@lewis2020retrieval] or web browsing [@nakano2021webgpt].
 Soon after, others were exploring language models integrated with programs [@gao2023pal] or tools [@parisi2022talm].
 
 As the field matured, these models gained more complex abilities in addition to the vast improvements to the underlying language modeling.
-For example, ToolFormer could use "a calculator, a Q&A system, two different search engines, a translation system, and a calendar" [@schick2023toolformerlanguagemodelsteach].
-Soon after, Gorilla was trained to use 1645 APIs (from PyTorch Hub, TensorFlow Hub v2, and HuggingFace) and its evaluation APIBench became a foundation of the popular Berkeley Function Calling Leaderboard [@patil2023gorilla].
+For example, Toolformer could use "a calculator, a Q&A system, two different search engines, a translation system, and a calendar" [@schick2023toolformerlanguagemodelsteach].
+Soon after, Gorilla was trained to use 1645 APIs (from PyTorch Hub, TensorFlow Hub v2, and Hugging Face) and its evaluation APIBench became a foundation of the popular Berkeley Function Calling Leaderboard [@patil2023gorilla].
 Since these early models, the diversity of actions called has grown substantially.
 
 Tool-use models are now deeply intertwined with regular language model interactions.
@@ -83,8 +94,7 @@ ToolLLM and its ToolBench dataset provide a large-scale framework for training a
 
 ## Interweaving Tool Calls in Generation
 
-Function calling agents are presented data very similarly to other post-training stages. 
-The addition is the content in the system prompt that instructs the model what tools it has available. 
+Training data for function calling looks much like other post-training data, with one addition: a system prompt that instructs the model what tools it has available.
 An example formatted data point with the system prompt and tools available in JSON format is shown below:
 ```xml
 <system>
@@ -150,7 +160,7 @@ You are a function-calling AI model. You are provided with function signatures w
 ...
 </user>
 ``` 
-While the language model is generating, if following the above example, it would generate the tokens `search_movies("Star Wars")` to search for Star Wars.
+Although the language model is generating a completion, if it is following this example, it would generate the tokens `search_movies("Star Wars")` to search for Star Wars.
 This is often encoded inside special formatting tokens, and then the next tokens inserted into the sequence will contain the tool outputs.
 With this, models can learn to accomplish more challenging tasks than many simple standalone models.
 
@@ -162,7 +172,7 @@ As with function calling, there are tags first for the code to execute (generate
 What is the 50th Fibonacci number? (Use the standard F_0=0, F_1=1 indexing.)</s>
 <|assistant|>
 <think>
-Okay, I will compute the 50-th Fibonacci number with a simple loop, then return the result.
+Okay, I will compute the 50th Fibonacci number with a simple loop, then return the result.
 
 <code>
 def fib(n):
@@ -179,7 +189,7 @@ fib(50)
 </output>
 </think>
 <answer>
-The 50-th Fibonacci number is 12 586 269 025.
+The 50th Fibonacci number is 12 586 269 025.
 </answer>
 ```
 
@@ -198,12 +208,12 @@ while True:
         messages.append({"role": "tool", "tool_call_id": call.id, "content": result})
 ```
 
-![Tool use interleaves model generation with external execution: the model generates tokens until it emits a tool call (orange), an external system executes the tool and injects the output (purple) into the sequence, then the model continues generating. Models can emit multiple tool calls in a single generation. During training, tool call and output tokens are typically masked from the loss.](images/tool_use_generation.png){#fig:tool-use-generation}
+![Tool use interleaves model generation with external execution: the model generates tokens until it emits a tool call (orange), an external system executes the tool and injects the output (purple) into the sequence, then the model continues generating. Models can emit multiple tool calls in a single generation. During training, tool call and output tokens are typically masked from the loss.](images/tool_use_generation.png){#fig:tool-use-generation data-dark-src="images/tool_use_generation-dark.png"}
 
 Training for tool use is about getting the model to behave predictably with this different token flow—knowing when to emit a tool call, how to format arguments correctly, and how to incorporate results into its response.
 Open models must be trained to work with a variety of tools that users may connect off the shelf.
 
-## Multi-step Tool Reasoning
+## Multistep Tool Reasoning
 
 OpenAI's o3 model represented a substantial step-change in how multi-step tool-use can be integrated with language models.
 This behavior is related to much earlier research trends in the community.
@@ -212,8 +222,11 @@ For example, ReAct [@yao2023react] showcased how actions and reasoning can be in
 > In this paper, we explore the use of LLMs to generate both reasoning traces and task-specific actions in an interleaved manner, allowing for greater synergy between the two: reasoning traces help the model induce, track, and update action plans as well as handle exceptions, while actions allow it to interface with and gather additional information from external sources such as knowledge bases or environments.
 
 With the solidification of tool-use capabilities and the take-off of reasoning models, multi-turn tool-use has grown into an exciting area of research [@wang2025ragenunderstandingselfevolutionllm].
+Training these multi-step behaviors with RL resembles classic reinforcement learning more than the per-sample RLHF loop: the agent interacts with an environment and its tools over a full trajectory before any reward is assigned, as shown in @fig:tool-use-rl.
 
-## Model Context Protocol (MCP)
+![Reinforcement learning for multi-step tool use. A prompt is sampled from the training data and the agent (policy $\pi_\theta$) interacts with the environment and its tools over a trajectory, alternating actions $a_t$ with observations $o_t$. The completed trajectory is graded or verified to produce a single reward $r_T$ at the end, which drives the policy update. Unlike the per-sample RLHF loop, the reward arrives only after a multi-step rollout -- closer to classic RL.](images/tool_use_rl_loop.png){#fig:tool-use-rl data-dark-src="images/tool_use_rl_loop-dark.png"}
+
+## Model Context Protocol
 
 Model Context Protocol (MCP) is an open standard for connecting language models to external data sources and information systems [@anthropic_mcp_2024].
 At the data layer, MCP uses JSON-RPC 2.0 with discovery and execution methods for its primitives.
@@ -278,9 +291,9 @@ async def call_tool(name: str, arguments: dict):
 
 There are multiple formatting and masking decisions when implementing a tool-use model:
 
-- **Python vs. JSON formatting**: In this chapter, we included examples that format tool use as both JSON data-structures and Python code. Models tend to select one structure, different providers across the industry use different formats.
-- **Masking tool outputs**: An important detail when training tool-use models is that the tokens in the tool output are masked from the model's training loss. This ensures the model is not learning to predict the output of the system that it does not directly generate in use (similar to prompt masking for other post-training stages).
-- **Multi-turn formatting for tool invocations**: It is common practice when implementing tool-calling models to add more structure to the dataloading format. Standard practice for post-training datasets is a list of messages alternating between user and assistant (and often a system message). The overall structure is the same for tool-use, but the turns of the model are split into subsections of content delimited by each tool call. An example is below.
+- **Python vs. JSON formatting**: In this chapter, we include examples that format tool use as both JSON data structures and Python code. Models tend to select one structure, whereas different providers across the industry use different formats.
+- **Masking tool outputs**: An important detail when training tool-use models is that the tokens in the tool output are masked from the model's training loss. This ensures the model is not learning to predict the output of the system that processes the tool call (as the results are not tokens generated by the model).
+- **Multi-turn formatting for tool invocations**: It is common practice when implementing tool-calling models to add more structure to the data-loading format. Standard practice for post-training datasets is a list of messages alternating between user and assistant (and often a system message). The overall structure is the same for tool-use, but the turns of the model are split into subsections of content delimited by each tool call. An example is below.
 
 ```python
 messages = [
@@ -305,10 +318,10 @@ messages = [
 ]
 ```
 
-- **Tokenization and message format details**: Tool calls in OpenAI messages format often undergo tokenization through chat templates (the code for controlling format of messages sent to the model), converting structured JSON representations into raw token streams. This process varies across model architectures---some use special tokens to demarcate tool calls, while others maintain structured formatting within the token stream itself. [Chat template playgrounds](https://huggingface.co/spaces/huggingfacejs/chat-template-playground?modelId=Qwen/Qwen3-8B) provides an interactive environment to explore how different models convert message formats to token streams.
-- **Reasoning token continuity**: As reasoning models have emerged, with their separate token stream of "reasoning" before an answer, different implementations exist for how they're handled with tool-use in the loop. Some models preserve reasoning tokens between tool-calling steps within a single turn, maintaining context across multiple tool invocations. However, these tokens are typically erased between turns to minimize serving cost (but aren't always -- this is a design decision).
-- **API formatting across providers** (As of July 2025): Different providers use conceptually similar but technically distinct formats. OpenAI uses `tool_calls` arrays with unique IDs, Anthropic employs detailed `input_schema` specifications with `<thinking>` tags, and Gemini offers function calling modes (AUTO/ANY/NONE). When using these models via an API, the tools available are defined in a JSON format and then the tool outputs in the model response are stored in a separate field from the standard "tokens generated." For another example, the open-source vLLM inference codebase implements extensive parsing logic supporting multiple tool calling modes and model-specific parsers, providing insights into lower-level implementation considerations [@kwon2023efficient].
-- **Schema conformance and constrained decoding**: Production systems often enforce valid JSON and correct argument types using constrained decoding or "strict mode" options, reducing retries from malformed outputs. Some closed model providers do additional post-training specifically to make structured JSON output reliable, where for open models this is handled as an inference flag in systems like VLLM.
+- **Tokenization and message format details**: Tool calls in OpenAI messages format often undergo tokenization through chat templates (the code for controlling the format of messages sent to the model), converting structured JSON representations into raw token streams. This process varies across model architectures---some use special tokens to demarcate tool calls, while others maintain structured formatting within the token stream itself. [Chat template playgrounds](https://huggingface.co/spaces/huggingfacejs/chat-template-playground?modelId=Qwen/Qwen3-8B) provide an interactive environment to explore how different models convert message formats to token streams.
+- **Reasoning token continuity**: As reasoning models have emerged, with their separate token stream of "reasoning" before an answer, different implementations exist for how they're handled with tool-use in the loop. Some models preserve reasoning tokens between tool-calling steps within a single turn, maintaining context across multiple tool invocations. However, these tokens are typically erased between turns to minimize serving cost (but they aren't always -- this is a design decision).
+- **API formatting across providers** (as of May 2026): Different providers use conceptually similar but technically distinct formats. OpenAI's Chat Completions API uses `tool_calls` arrays with unique IDs, while the newer Responses API represents calls as `function_call` items and returns results as `function_call_output` items keyed by `call_id`. Anthropic defines tools with `input_schema` and represents calls and results as `tool_use` and `tool_result` content blocks. Gemini exposes function-calling modes such as `AUTO`, `ANY`, `NONE`, and, in supported Gemini and Vertex AI configurations, `VALIDATED`.
+- **Schema conformance and constrained decoding**: Production systems often enforce valid JSON and correct argument types using constrained decoding or "strict mode" options, reducing retries from malformed outputs. Some closed model providers do additional post-training specifically to make structured JSON output reliable, whereas for open models this is handled as an inference flag in systems like vLLM.
 - **Tool output context consumption**: Tool outputs can quickly consume the model's context window, especially with search or retrieval tools that return many results. Systems must decide how to truncate, summarize, or paginate tool outputs to keep context manageable while preserving the information the model needs to continue.
 
 Tying this back to post-training: where does tool-use training data come from, and what objectives are used?

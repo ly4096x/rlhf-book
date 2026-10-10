@@ -6,21 +6,16 @@ This module provides common functionality shared across ORM, PRM, and Preference
 - Data utilities: collate functions
 
 Note: We use full fine-tuning for simplicity with small models (0.6B-1.7B).
-For larger models, consider using LoRA/QLoRA (see commented code below).
 """
 
 import os
-from typing import Callable, Iterator
+from typing import Callable
 
 import torch
 import torch.nn as nn
 import wandb
 from torch.utils.data import DataLoader
 from transformers import AutoModelForCausalLM, AutoTokenizer
-
-# Commented out LoRA imports - kept for reference if needed for larger models
-# from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-# from transformers import BitsAndBytesConfig
 
 
 # =============================================================================
@@ -44,19 +39,16 @@ class BaseRewardModel(nn.Module):
         model_id: str,
         head_dim: int = 1,
         freeze_backbone: bool = False,
-        # LoRA params kept for potential future use
-        # lora_r: int = 16,
-        # lora_alpha: int = 32,
-        # lora_dropout: float = 0.05,
+        device: str | torch.device = "cuda",
     ):
         super().__init__()
 
-        # BF16 loading - simple for small models
-        device_map = {"": 0} if torch.cuda.is_available() else None
+        # Keep trainable parameters and optimizer state in FP32. Training loops
+        # use BF16 autocast on CUDA for lower-precision compute.
         self.model = AutoModelForCausalLM.from_pretrained(
             model_id,
-            dtype="bfloat16",  # Use string to avoid deprecation warning
-            device_map=device_map,
+            dtype=torch.float32,
+            device_map={"": device},
             trust_remote_code=True,
         )
         self.model.config.use_cache = False
@@ -66,32 +58,8 @@ class BaseRewardModel(nn.Module):
             for param in self.model.parameters():
                 param.requires_grad = False
 
-        # Build head with same dtype as model
+        # Module parameters default to FP32, matching the backbone.
         self.head = self._build_head(self.model.config.hidden_size, head_dim)
-        self.head = self.head.to(torch.bfloat16)
-
-        # --- Commented out LoRA setup for reference ---
-        # bnb_config = BitsAndBytesConfig(
-        #     load_in_4bit=True,
-        #     bnb_4bit_compute_dtype=torch.bfloat16,
-        # )
-        # lora_config = LoraConfig(
-        #     r=lora_r,
-        #     lora_alpha=lora_alpha,
-        #     lora_dropout=lora_dropout,
-        #     bias="none",
-        #     task_type="CAUSAL_LM",
-        #     target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
-        #                     "gate_proj", "up_proj", "down_proj"],
-        # )
-        # base = AutoModelForCausalLM.from_pretrained(
-        #     model_id,
-        #     quantization_config=bnb_config,
-        #     device_map=device_map,
-        #     trust_remote_code=True,
-        # )
-        # base = prepare_model_for_kbit_training(base)
-        # self.model = get_peft_model(base, lora_config)
 
     def _build_head(self, hidden_size: int, output_dim: int) -> nn.Module:
         """Build the reward head. Override for custom architectures."""
@@ -103,14 +71,13 @@ class BaseRewardModel(nn.Module):
         attention_mask: torch.Tensor,
     ) -> torch.Tensor:
         """Get the last hidden states from the model."""
-        outputs = self.model(
+        outputs = self.model.base_model(
             input_ids=input_ids,
             attention_mask=attention_mask,
-            output_hidden_states=True,
             use_cache=False,
             return_dict=True,
         )
-        return outputs.hidden_states[-1]
+        return outputs.last_hidden_state
 
     @property
     def device(self) -> torch.device:
@@ -153,10 +120,12 @@ def init_wandb(
     Returns:
         True if wandb is enabled, False otherwise
     """
+    wandb_entity = os.environ.get("WANDB_ENTITY")
     wandb_project = os.environ.get("WANDB_PROJECT")
 
     if use_wandb and wandb_project:
         wandb.init(
+            entity=wandb_entity,
             project=wandb_project,
             name=os.environ.get("WANDB_RUN_NAME", default_run_name),
             config=config,
@@ -254,7 +223,13 @@ def training_loop(
         avg_loss = epoch_loss / len(loader)
         avg_metrics = {k: v / len(loader) for k, v in epoch_metrics.items()}
         print(f"Epoch {epoch} | Loss: {avg_loss:.4f} | {avg_metrics}")
-        log_metrics({"epoch_loss": avg_loss, "epoch": epoch, **{f"epoch_{k}": v for k, v in avg_metrics.items()}})
+        log_metrics(
+            {
+                "epoch_loss": avg_loss,
+                "epoch": epoch,
+                **{f"epoch_{k}": v for k, v in avg_metrics.items()},
+            }
+        )
 
 
 # =============================================================================
@@ -286,6 +261,7 @@ def create_collate_fn(tokenizer: AutoTokenizer, fields: list[str]):
         fields: List of field names to collate. Fields ending in '_ids' use
                 pad_token_id, fields ending in '_mask' use 0, others use -100.
     """
+
     def collate_fn(batch: list[dict]) -> dict[str, torch.Tensor]:
         result = {}
         for field in fields:

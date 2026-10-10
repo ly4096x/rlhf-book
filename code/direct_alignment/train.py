@@ -4,7 +4,7 @@
 # See Chapter 8 for mathematical derivations.
 #
 # Usage:
-#   uv run python -m direct_alignment.train --config configs/dpo.yaml
+#   uv run python -m direct_alignment.train --config direct_alignment/configs/dpo.yaml
 #   uv run python -m direct_alignment.train --loss dpo --max_samples 1000
 #
 # References:
@@ -21,16 +21,15 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 import wandb
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 from torch.nn.utils import clip_grad_norm_
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from .config import Config, load_config
 from .data import PreferenceBatch, create_dataloader
-from .loss import compute_logprobs, get_loss_function, ORPOLoss
+from .loss import ORPOLoss, compute_logprobs, get_loss_function
 
 
 def get_attn_implementation() -> str:
@@ -39,9 +38,22 @@ def get_attn_implementation() -> str:
         return "sdpa"  # aarch64 / DGX Spark - use SDPA with cuDNN
     try:
         import flash_attn  # noqa: F401
+
         return "flash_attention_2"
     except ImportError:
         return "sdpa"
+
+
+def resolve_device(device: str = "auto") -> torch.device:
+    """Resolve 'auto' to CUDA if available, otherwise CPU."""
+    if device == "auto":
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    elif device == "cuda":
+        if not torch.cuda.is_available():
+            raise ValueError("CUDA is not available, but device is set to 'cuda'")
+    elif device != "cpu":
+        raise ValueError(f"Unsupported device={device!r}. Expected 'auto', 'cuda', or 'cpu'.")
+    return torch.device(device)
 
 
 def seed_everything(seed: int) -> None:
@@ -58,7 +70,7 @@ def seed_everything(seed: int) -> None:
 
 def load_model(
     model_name: str,
-    device: str,
+    device: torch.device,
     gradient_checkpointing: bool = True,
     bf16: bool = True,
 ):
@@ -79,14 +91,12 @@ def load_model(
     model = model.to(device)
 
     if gradient_checkpointing:
-        model.gradient_checkpointing_enable(
-            gradient_checkpointing_kwargs={"use_reentrant": False}
-        )
+        model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
 
     return model, tokenizer
 
 
-def load_ref_model(model_name: str, device: str, bf16: bool = True):
+def load_ref_model(model_name: str, device: torch.device, bf16: bool = True):
     """Load reference model (frozen, no gradient checkpointing)."""
     attn_impl = get_attn_implementation()
     dtype = torch.bfloat16 if bf16 else torch.float32
@@ -276,7 +286,9 @@ def print_training_info(console: Console, cfg: Config, num_samples: int):
     console.print(f"  Beta: {cfg.beta}")
     console.print(f"  Dataset: {cfg.dataset_name}")
     console.print(f"  Samples: {num_samples}")
-    console.print(f"  Batch size: {cfg.batch_size} x {cfg.gradient_accumulation_steps} = {cfg.batch_size * cfg.gradient_accumulation_steps}")
+    console.print(
+        f"  Batch size: {cfg.batch_size} x {cfg.gradient_accumulation_steps} = {cfg.batch_size * cfg.gradient_accumulation_steps}"
+    )
     console.print(f"  Learning rate: {cfg.learning_rate}")
     console.print(f"  Epochs: {cfg.num_epochs}")
     console.print(
@@ -428,7 +440,7 @@ def generate_samples(
 
         # Decode response only (not the prompt)
         response = tokenizer.decode(
-            outputs[0][inputs["input_ids"].shape[1]:],
+            outputs[0][inputs["input_ids"].shape[1] :],
             skip_special_tokens=True,
         )
 
@@ -448,7 +460,9 @@ def generate_samples(
         # Print to console if provided
         if console:
             console.print(f"\n[bold cyan]Prompt {prompt_id}:[/bold cyan] {prompt}")
-            console.print(f"[bold green]Response:[/bold green] {response[:500]}{'...' if len(response) > 500 else ''}")
+            console.print(
+                f"[bold green]Response:[/bold green] {response[:500]}{'...' if len(response) > 500 else ''}"
+            )
 
     model.train()
     return samples
@@ -498,12 +512,14 @@ def main(cfg: Config):
     # Print attention implementation
     attn_impl = get_attn_implementation()
     console.print(f"[dim]Using attention implementation: {attn_impl}[/dim]")
+    device = resolve_device(cfg.device)
+    console.print(f"[dim]Using device: {device}[/dim]")
 
     # Load models
     console.print(f"[dim]Loading policy model: {cfg.model_name}[/dim]")
     policy_model, tokenizer = load_model(
         cfg.model_name,
-        cfg.device,
+        device,
         gradient_checkpointing=cfg.gradient_checkpointing,
         bf16=cfg.bf16,
     )
@@ -514,7 +530,7 @@ def main(cfg: Config):
         console.print("[dim]No reference model needed for this loss[/dim]")
     else:
         console.print(f"[dim]Loading reference model: {cfg.ref_model_name}[/dim]")
-        ref_model = load_ref_model(cfg.ref_model_name, cfg.device, bf16=cfg.bf16)
+        ref_model = load_ref_model(cfg.ref_model_name, device, bf16=cfg.bf16)
 
     # Create dataloader
     console.print(f"[dim]Loading dataset: {cfg.dataset_name}[/dim]")
@@ -531,14 +547,14 @@ def main(cfg: Config):
     print_training_info(console, cfg, len(dataloader.dataset))
 
     # Get loss function
-    # ORPO and SimPO both use average sequence log-probs (TRL-style).
+    # ORPO, SimPO, and DPO-Norm use average sequence log-probs (TRL-style).
     # For ORPO this avoids extreme log-odds magnitudes that show up with summed log-probs.
-    use_average_logprob = cfg.loss in ["simpo", "orpo"]
+    use_average_logprob = cfg.loss in ["simpo", "orpo", "dpo_norm"]
     loss_fn = get_loss_function(
         cfg.loss,
         beta=cfg.beta,
         gamma=cfg.gamma if cfg.loss == "simpo" else None,
-        label_smoothing=cfg.label_smoothing if cfg.loss in ["dpo", "cdpo"] else None,
+        label_smoothing=cfg.label_smoothing if cfg.loss in ["dpo", "dpo_norm", "cdpo"] else None,
     )
 
     # Optimizer with warmup
@@ -559,11 +575,15 @@ def main(cfg: Config):
         if step < num_warmup_steps:
             # Start warmup at 1/num_warmup_steps, not 0 (avoids first step doing nothing)
             return float(step + 1) / float(max(1, num_warmup_steps + 1))
-        return max(0.0, float(num_training_steps - step) / float(max(1, num_training_steps - num_warmup_steps)))
+        return max(
+            0.0,
+            float(num_training_steps - step) / float(max(1, num_training_steps - num_warmup_steps)),
+        )
 
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 
     # Initialize wandb
+    wandb_entity = os.environ.get("WANDB_ENTITY", cfg.wandb_entity)
     wandb_project = os.environ.get("WANDB_PROJECT", cfg.wandb_project)
     wandb_run_name = os.environ.get("WANDB_RUN_NAME", cfg.wandb_run_name)
 
@@ -571,6 +591,7 @@ def main(cfg: Config):
         wandb.init(mode="disabled")
     else:
         wandb.init(
+            entity=wandb_entity,
             project=wandb_project,
             name=wandb_run_name or f"{cfg.loss}-{cfg.model_name.split('/')[-1]}",
             config=vars(cfg),
@@ -632,7 +653,9 @@ def main(cfg: Config):
 
                 # Update scheduler after optimizer step
                 if (batch_idx + 1) % cfg.gradient_accumulation_steps == 0:
-                    step_metrics = {key: value / metrics_count for key, value in metrics_sum.items()}
+                    step_metrics = {
+                        key: value / metrics_count for key, value in metrics_sum.items()
+                    }
                     scheduler.step()
                     global_step += 1
 
@@ -651,7 +674,9 @@ def main(cfg: Config):
 
                     # Generate and log samples periodically
                     if cfg.sample_every > 0 and global_step % cfg.sample_every == 0:
-                        console.print(f"\n[bold yellow]Generating samples at step {global_step}...[/bold yellow]")
+                        console.print(
+                            f"\n[bold yellow]Generating samples at step {global_step}...[/bold yellow]"
+                        )
                         prompt_entries = select_sample_prompts(
                             prompt_pool=sample_prompt_pool,
                             sample_num_prompts=cfg.sample_num_prompts,
@@ -690,7 +715,11 @@ def main(cfg: Config):
                 scheduler.step()
                 global_step += 1
 
-                step_metrics = {key: value / metrics_count for key, value in metrics_sum.items()} if metrics_count > 0 else {}
+                step_metrics = (
+                    {key: value / metrics_count for key, value in metrics_sum.items()}
+                    if metrics_count > 0
+                    else {}
+                )
                 # Log final partial batch
                 step_metrics["learning_rate"] = scheduler.get_last_lr()[0]
                 step_metrics["epoch"] = epoch + 1.0
@@ -755,26 +784,50 @@ def main_cli():
 
     # Override individual settings
     parser.add_argument("--model_name", type=str, help="Model name or path")
-    parser.add_argument("--loss", type=str, choices=["dpo", "cdpo", "ipo", "simpo", "orpo", "kto"])
+    parser.add_argument(
+        "--loss",
+        type=str,
+        choices=["dpo", "dpo_norm", "cdpo", "ipo", "simpo", "orpo", "kto", "apo_zero", "apo_down"],
+    )
     parser.add_argument("--beta", type=float, help="Beta parameter")
     parser.add_argument("--gamma", type=float, help="SimPO gamma/beta ratio")
-    parser.add_argument("--dataset_name", type=str, help="HuggingFace dataset name")
+    parser.add_argument("--dataset_name", type=str, help="Hugging Face dataset name")
     parser.add_argument("--max_samples", type=int, help="Max training samples")
     parser.add_argument("--max_length", type=int, help="Max sequence length")
     parser.add_argument("--learning_rate", type=float, help="Learning rate")
     parser.add_argument("--num_epochs", type=int, help="Number of epochs")
     parser.add_argument("--batch_size", type=int, help="Batch size")
     parser.add_argument("--gradient_accumulation_steps", type=int)
+    parser.add_argument("--wandb_entity", type=str, help="Wandb entity/team name")
+    parser.add_argument("--device", type=str, choices=["auto", "cuda", "cpu"])
     parser.add_argument("--wandb_project", type=str, help="Wandb project name")
-    parser.add_argument("--sample_every", type=int, help="Generate samples every N steps (0 to disable)")
+    parser.add_argument(
+        "--sample_every", type=int, help="Generate samples every N steps (0 to disable)"
+    )
     parser.add_argument("--sample_num_prompts", type=int, help="Prompts per sample event")
-    parser.add_argument("--sample_prompt_strategy", type=str, choices=["fixed", "round_robin", "random"])
-    parser.add_argument("--sample_prompts_file", type=str, help="Optional .txt/.json prompt list for in-loop samples")
+    parser.add_argument(
+        "--sample_prompt_strategy", type=str, choices=["fixed", "round_robin", "random"]
+    )
+    parser.add_argument(
+        "--sample_prompts_file",
+        type=str,
+        help="Optional .txt/.json prompt list for in-loop samples",
+    )
     parser.add_argument("--sample_max_tokens", type=int, help="Max new tokens per in-loop sample")
-    parser.add_argument("--sample_max_input_tokens", type=int, help="Max prompt tokens for in-loop sample generation")
-    parser.add_argument("--sample_temperature", type=float, help="Temperature for in-loop sample generation")
+    parser.add_argument(
+        "--sample_max_input_tokens",
+        type=int,
+        help="Max prompt tokens for in-loop sample generation",
+    )
+    parser.add_argument(
+        "--sample_temperature", type=float, help="Temperature for in-loop sample generation"
+    )
     parser.add_argument("--sample_top_p", type=float, help="Top-p for in-loop sample generation")
-    parser.add_argument("--sample_do_sample", action=argparse.BooleanOptionalAction, help="Enable/disable stochastic in-loop sampling")
+    parser.add_argument(
+        "--sample_do_sample",
+        action=argparse.BooleanOptionalAction,
+        help="Enable/disable stochastic in-loop sampling",
+    )
     parser.add_argument("--seed", type=int, help="Random seed")
 
     args = parser.parse_args()

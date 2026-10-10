@@ -7,7 +7,7 @@ fonts:
 bibliography: refs.bib
 figure_captions: true
 footer:
-  left: "rlhfbook.com"
+  left: "rlhfbook.com/course"
   center: "Lecture 2"
   right: "Lambert {n}/{N}"
 custom_css: |
@@ -32,7 +32,7 @@ custom_css: |
 <p class="colloquium-title-name">Nathan Lambert</p>
 </div>
 
-<p class="colloquium-title-note">Course on RLHF and post-training. Chapters 4, 5 & 9 </p>
+<p class="colloquium-title-note">Post-training course. Chapters 4, 5 & 9 </p>
 
 ---
 
@@ -47,35 +47,35 @@ tone: muted
 compact: true
 content: |
   1. Introduction
-  2. Key Related Works
-  3. Training Overview
+  2. Key related works
+  3. Training overview
 ```
 
 |||
 
 ```box
-title: Core Training Pipeline
+title: Core training pipeline
 tone: accent
 compact: true
 content: |
-  4. **Instruction Tuning**
-  5. **Reward Models**
-  6. Reinforcement Learning
+  4. **Instruction tuning**
+  5. **Reward models**
+  6. Reinforcement learning
   7. Reasoning
-  8. Direct Alignment
-  9. **Rejection Sampling**
+  8. Direct alignment
+  9. **Rejection sampling**
 ```
 
 |||
 
 ```box
-title: Data & Preferences
+title: Data & preferences
 tone: muted
 compact: true
 content: |
-  10. What are Preferences
-  11. Preference Data
-  12. Synthetic Data & CAI
+  10. What are preferences
+  11. Preference data
+  12. Synthetic data & CAI
 ```
 
 ===
@@ -83,15 +83,15 @@ content: |
 <!-- row-columns: 32/36/32 -->
 
 ```box
-title: Practical Considerations
+title: Practical considerations
 tone: muted
 compact: true
 content: |
-  13. Tool Use
+  13. Tool use
   14. Over-optimization
   15. Regularization
   16. Evaluation
-  17. Product & Character
+  17. Product & character
 ```
 
 |||
@@ -102,14 +102,14 @@ tone: surface
 compact: true
 content: |
   - A. Definitions
-  - B. Style & Information
-  - C. Practical Issues
+  - B. Style & information
+  - C. Practical issues
 ```
 
 |||
 
 ```box
-title: Course Home
+title: Course home
 tone: surface
 compact: true
 content: |
@@ -749,11 +749,11 @@ $$= \arg\max_\theta \; \sigma\!\left( r_\theta(y_c \mid x) - r_\theta(y_r \mid x
 
 $$\theta^* = \arg\max_\theta \; \sigma\!\left( r_\theta(y_c \mid x) - r_\theta(y_r \mid x) \right)$$
 
-$\log$ is monotonic, so $\arg\max \sigma(\cdot) = \arg\max \log \sigma(\cdot)$:
+Training maximizes the **log**-likelihood over the dataset -- take $\log$ *before* averaging, since $\mathbb{E}[\log P] \neq \mathbb{E}[P]$:
 
-$$= \arg\max_\theta \; \log \sigma\!\left( r_\theta(y_c \mid x) - r_\theta(y_r \mid x) \right)$$
+$$\theta^* = \arg\max_\theta \; \mathbb{E}_{(x, y_c, y_r) \sim D}\left[\log \sigma\!\left( r_\theta(y_c \mid x) - r_\theta(y_r \mid x) \right)\right]$$
 
-Flip the sign to turn maximization into minimization (a loss):
+Flip the sign for the (per-example) loss:
 
 $$\mathcal{L}(\theta) = - \log \sigma \left( r_{\theta}(y_c \mid x) - r_{\theta}(y_r \mid x) \right)$$
 
@@ -1258,35 +1258,35 @@ tone: muted
 compact: true
 content: |
   1. Introduction
-  2. Key Related Works
-  3. Training Overview
+  2. Key related works
+  3. Training overview
 ```
 
 |||
 
 ```box
-title: Core Training Pipeline
+title: Core training pipeline
 tone: accent
 compact: true
 content: |
-  4. **Instruction Tuning**
-  5. **Reward Models**
-  6. Reinforcement Learning
+  4. **Instruction tuning**
+  5. **Reward models**
+  6. Reinforcement learning
   7. Reasoning
-  8. Direct Alignment
-  9. **Rejection Sampling**
+  8. Direct alignment
+  9. **Rejection sampling**
 ```
 
 |||
 
 ```box
-title: Data & Preferences
+title: Data & preferences
 tone: muted
 compact: true
 content: |
-  10. What are Preferences
-  11. Preference Data
-  12. Synthetic Data & CAI
+  10. What are preferences
+  11. Preference data
+  12. Synthetic data & CAI
 ```
 
 ===
@@ -1294,15 +1294,15 @@ content: |
 <!-- row-columns: 32/36/32 -->
 
 ```box
-title: Practical Considerations
+title: Practical considerations
 tone: muted
 compact: true
 content: |
-  13. Tool Use
+  13. Tool use
   14. Over-optimization
   15. Regularization
   16. Evaluation
-  17. Product & Character
+  17. Product & character
 ```
 
 |||
@@ -1313,14 +1313,14 @@ tone: surface
 compact: true
 content: |
   - A. Definitions
-  - B. Style & Information
-  - C. Practical Issues
+  - B. Style & information
+  - C. Practical issues
 ```
 
 |||
 
 ```box
-title: Course Home
+title: Course home
 tone: surface
 compact: true
 content: |

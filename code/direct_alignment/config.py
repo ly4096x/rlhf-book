@@ -18,7 +18,9 @@ class Config:
     ref_model_name: str | None = None  # Defaults to model_name if None
 
     # Training settings
-    loss: Literal["dpo", "cdpo", "ipo", "simpo", "orpo", "kto"] = "dpo"
+    loss: Literal[
+        "dpo", "dpo_norm", "cdpo", "ipo", "simpo", "orpo", "kto", "apo_zero", "apo_down"
+    ] = "dpo"
     beta: float = 0.1  # KL penalty / temperature
     gamma: float = 0.5  # SimPO gamma/beta margin ratio (effective shift is beta * gamma)
     label_smoothing: float = 0.0  # For cDPO (overridden if loss=cdpo)
@@ -31,8 +33,12 @@ class Config:
     # Sequence length settings (TRL-style controls)
     max_length: int = 512  # Max total sequence length (prompt + completion)
     max_prompt_length: int | None = None  # Max prompt length (truncated from left if exceeded)
-    max_completion_length: int | None = None  # Max completion length (truncated from right if exceeded)
-    truncation_mode: Literal["keep_end", "keep_start"] = "keep_end"  # How to truncate: keep_end preserves response
+    max_completion_length: int | None = (
+        None  # Max completion length (truncated from right if exceeded)
+    )
+    truncation_mode: Literal["keep_end", "keep_start"] = (
+        "keep_end"  # How to truncate: keep_end preserves response
+    )
 
     # Training hyperparameters
     learning_rate: float = 5e-7  # DPO typically uses very low LR
@@ -44,11 +50,12 @@ class Config:
     max_grad_norm: float = 1.0
 
     # Hardware settings
-    device: str = "cuda"
+    device: Literal["auto", "cuda", "cpu"] = "auto"
     gradient_checkpointing: bool = True
     bf16: bool = True
 
     # Logging
+    wandb_entity: str | None = None
     wandb_project: str | None = None
     wandb_run_name: str | None = None
     log_every: int = 10
@@ -78,8 +85,8 @@ class Config:
         # Loss-specific defaults
         if self.loss == "cdpo":
             self.label_smoothing = 0.1
-        elif self.loss == "simpo":
-            # SimPO typically uses higher beta
+        elif self.loss in ["simpo", "dpo_norm"]:
+            # SimPO and DPO-Norm typically use higher beta
             if self.beta == 0.1:  # Only override if default
                 self.beta = 2.0
 
@@ -101,5 +108,6 @@ def load_config(config_path: str | Path) -> Config:
 def save_config(config: Config, config_path: str | Path) -> None:
     """Save configuration to YAML file."""
     import dataclasses
+
     with open(config_path, "w") as f:
         yaml.dump(dataclasses.asdict(config), f, default_flow_style=False)

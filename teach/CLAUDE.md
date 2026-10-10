@@ -4,16 +4,29 @@
 
 Slides are built with [colloquium](https://github.com/natolambert/colloquium) from Markdown source files.
 
-- Each talk/lecture lives in its own directory (e.g. `SALA-2026/`, `course/`)
-- Source files are `talk.md` or `slides.md` (for talks) or `lec*.md` (for course lectures)
-- Assets go in an `assets/` subdirectory per talk/course
-- References are shared via `bibliography: ../SALA-2026/refs.bib` (or similar relative path)
+- Standalone talks live in their own directories (e.g. `SALA-2026/`); course decks share `course/`
+- Source files are `talk.md` or `slides.md` for standalone talks, and `lec*.md`, `qa-*.md`, or `conversation-*.md` for the course
+- Assets go in each talk's local `assets/` directory or the shared `course/assets/` directory
+- Bibliographies are local to each collection: standalone talks use their directory's `refs.bib`, and course decks use `course/refs.bib`
 
-## Animation via Slide Repeats
+## Agent Skills
 
-Colloquium does not have built-in animation/fragment support. To simulate animations (progressive reveals), **duplicate the slide** with additional content on each copy. For example, a slide shown first with 4 bullets, then repeated with 2 more bullets below, is intentional — do NOT merge these into one slide.
+`teach/.claude/skills/qa-video-timestamps/` extracts per-question (MM:SS)
+timestamps from a published recording (OCR of the slide counter) and adds
+YouTube deep links to the course page's Q&A question lists. Use it whenever a
+Q&A/lecture video is published or timestamp links need refreshing.
 
-**Math derivation unrolls**: For step-by-step derivations, use the same pattern — repeat the slide with one additional derivation step each time. Keep the title and earlier steps identical so the audience sees each new line appear. This is especially useful for multi-step algebra (e.g. Bradley-Terry → loss function). The result looks like repetition in the source, but each copy is a separate slide that reveals one more step.
+## Animations and Progressive Reveals
+
+Colloquium has built-in HTML fragment support. Prefer fragments over duplicate slides for progressive reveals:
+
+- `<!-- animate: bullets -->` reveals each list item one at a time.
+- `<!-- animate: blocks -->` reveals each top-level block one at a time.
+- `<!-- step -->` reveals the content after the marker on the next click. Add multiple markers for multiple reveal points.
+
+**Put no content after the animated list.** With `<!-- animate: bullets -->`, only the list items become fragments — any paragraph *after* the list is not a fragment, so it renders immediately at step 0 and appears **before** the bullets it should follow (out of order). Keep lead-in prose *above* the list and end the slide on the final bullet; if a trailing line matters, fold it into the last bullet (or move it to a separate slide). The same applies to a trailing block under `<!-- animate: blocks -->` only when it is not itself a top-level block.
+
+**Math derivation unrolls**: For step-by-step derivations, add `<!-- step -->` before each new derivation step so the audience sees one manipulation at a time. Repeat a full slide only when separate static slides are intentionally needed, such as a handout or export workflow that should preserve each intermediate frame.
 
 **Never skip steps in derivations.** Every algebraic manipulation must be shown explicitly — if a term cancels, show it cancelling; if an expression is rewritten, show the intermediate form. Assume the audience cannot fill in gaps. For example, when dividing numerator and denominator by the same term, first show the division applied, then show the numerator simplifying to 1, then show the denominator simplifying. Each of these can be a separate slide.
 
@@ -22,6 +35,9 @@ Colloquium does not have built-in animation/fragment support. To simulate animat
 ## Colloquium Directives
 
 Key directives (HTML comments before or after the heading):
+- `<!-- animate: bullets -->` — reveal list items one at a time
+- `<!-- animate: blocks -->` — reveal top-level blocks one at a time
+- `<!-- step -->` — reveal the following content on the next click
 - `<!-- columns: 45/55 -->` — side-by-side columns
 - `<!-- rows: 48/52 -->` — top/bottom rows, separated by `===`
 - `<!-- row-columns: 50/50 -->` — columns within a row
@@ -31,6 +47,16 @@ Key directives (HTML comments before or after the heading):
 - `<!-- layout: section-break -->` — section break slide
 - `<!-- valign: center -->` — vertically center content
 - `<!-- img-align: center -->` — center images
+
+## Images
+
+Colloquium auto-sizes images to fit their slide/column/row container — you do **not** need a custom CSS class (e.g. `{.recipe-fig}`) or a `max-height` rule to keep a figure from overflowing. Just reference the image normally:
+
+```markdown
+![Caption](assets/diagram.png)
+```
+
+Only add sizing when you want to deviate from the default fit (e.g. `{width=60%}` to shrink a figure). Don't add empty wrapper classes "just in case."
 
 ## Heading Parsing
 
@@ -60,21 +86,27 @@ Two citation modes — choose based on what is being cited:
 ## Build
 
 ```bash
-uv run colloquium build teach/SALA-2026/talk.md -o build/
-uv run colloquium export teach/SALA-2026/talk.md -o slides.pdf
+uv run --extra teach colloquium build teach/SALA-2026/talk.md -o build/
+uv run --extra teach colloquium export teach/SALA-2026/talk.md -o slides.pdf
 ```
 
 ## Local Preview (Live Reload)
 
-`colloquium serve` serves from the input file's parent directory. When slides reference assets via `../` paths (e.g. `../SALA-2026/assets/`), images break because the web server won't serve files above its root.
+`colloquium serve` writes the rendered HTML into the output directory and serves from there. Relative image paths in the Markdown are preserved in the HTML, so the output directory must match the directory those paths expect.
 
-**Workaround**: Call `serve()` directly with `output_dir` set to `teach/` so the serve root is high enough to resolve all relative paths:
+For course lectures in `teach/course/`, images are referenced as `assets/...`, so the rendered HTML must live in `teach/course/` next to the `assets/` folder:
 
 ```bash
 # From the repo root:
-uv run python -c "from colloquium.serve import serve; serve('teach/course/lec1-chap1-3.md', port=8080, output_dir='teach')"
+uv run --extra teach python -c "from colloquium.serve import serve; serve('teach/course/lec5-chap7.md', port=8081, output_dir='teach/course')"
 ```
 
-This gives you live rebuild on save + correct asset resolution. The URL will be `http://localhost:8080/<stem>.html`.
+The URL will be `http://localhost:8081/lec5-chap7.html`. Before handing the URL to the user, verify at least one deck image directly:
+
+```bash
+uv run --extra teach python -c "import urllib.request as u; urls=['http://127.0.0.1:8081/lec5-chap7.html','http://127.0.0.1:8081/assets/rlvr-system.png']; [print(x, (r := u.urlopen(x, timeout=3)).status, r.getheader('content-type')) for x in urls]"
+```
+
+For standalone talks with local `assets/...` references, run from the talk directory or set `output_dir` to that talk directory. If a deck intentionally references assets above its own directory, set `output_dir` high enough for those relative paths and verify an image URL before reporting success.
 
 Note: `colloquium serve` CLI does not expose `--output-dir` yet — this is a known limitation.

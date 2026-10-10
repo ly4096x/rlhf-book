@@ -4,7 +4,7 @@
 # Source: https://github.com/zafstojano/policy-gradients
 # License: Apache 2.0
 
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, model_validator
@@ -30,12 +30,23 @@ class Config(BaseModel):
 
     Attributes:
         data: Dataset configuration
-        loss: Loss function (reinforce, rloo, ppo, grpo, drgrpo, gspo, cispo)
-        model_name: HuggingFace model identifier
+        loss: Loss function (reinforce, rloo, ppo, grpo, drgrpo, gspo, cispo, sapo,
+            dapo, maxrl)
+        model_name: Hugging Face model identifier
 
-        # Clipping (GRPO, DrGRPO, GSPO, CISPO, PPO)
+        # Clipping (GRPO, DrGRPO, GSPO, CISPO, PPO, DAPO)
         clip_eps_lo: Lower clipping bound for policy ratio
         clip_eps_hi: Upper clipping bound for policy ratio
+
+        # SAPO-specific
+        sapo_temp_pos: Sigmoid temperature for positive advantages
+        sapo_temp_neg: Sigmoid temperature for negative advantages
+
+        # DAPO-specific
+        l_cache: Overlong penalty cache length
+        l_max: Overlong penalty maximum length
+        accuracy_min_reward: Minimum correctness reward for dynamic filtering
+        accuracy_max_reward: Maximum correctness reward for dynamic filtering
 
         # PPO-specific
         clip_eps_val: Clipping bound for value function
@@ -46,6 +57,7 @@ class Config(BaseModel):
 
         # Optional KL penalty (REINFORCE, RLOO, GRPO, etc.)
         beta: KL penalty coefficient (0 = disabled)
+        kl_estimator: KL estimator variant ('kl1', 'kl2', or 'kl3')
         ref_model_device_id: GPU for reference model (when beta > 0)
 
         # Generation
@@ -56,11 +68,11 @@ class Config(BaseModel):
         lr: Learning rate
         prompts_per_step: Prompts per training step
         num_rollouts: Rollouts per prompt (1 for REINFORCE/PPO, >1 for GRPO/RLOO)
-        rollout_batch_size: Batch size during generation
         train_batch_size: Batch size during training
         batch_acc: Gradient accumulation steps
         max_norm: Gradient clipping norm
         seed: Random seed
+        device: Device selection (auto, cuda, cpu)
         model_device_id: GPU for policy model
 
         # Logging
@@ -82,8 +94,24 @@ class Config(BaseModel):
     vf_coef: float = 0.1
     val_model_device_id: int = 0
 
+    # SAPO-specific params (soft sigmoid gate temperatures)
+    sapo_temp_pos: float = 1.0
+    sapo_temp_neg: float = 1.05
+
+    # DAPO-specific params (overlong length penalty)
+    l_cache: int = 256
+    l_max: int = 512
+
+    # DAPO-specific min and max rewards
+    accuracy_min_reward: float = 0.0
+    accuracy_max_reward: float = 1.0
+
+    # Reward shaping
+    format_weight: float = 0.5
+
     # KL penalty (optional, for REINFORCE/RLOO/GRPO when beta > 0)
     beta: float = 0.0
+    kl_estimator: str = "kl3"
     ref_model_device_id: int = 0
 
     # Generation params
@@ -97,23 +125,22 @@ class Config(BaseModel):
     lr: float = 5e-6
     prompts_per_step: int = 4
     num_rollouts: int = 8
-    rollout_batch_size: int = 8
     train_batch_size: int = 2
     batch_acc: int = 4
     max_norm: float = 1.0
     seed: int = 42
+    device: Literal["auto", "cuda", "cpu"] = "auto"
     model_device_id: int = 0
 
     # Logging
+    wandb_entity: str | None = None
     wandb_project: str | None = None
     wandb_run_name: str | None = None
 
     @model_validator(mode="after")
-    def validate_rollout_batch_size(self) -> "Config":
-        if self.num_rollouts > 1 and self.rollout_batch_size != self.num_rollouts:
-            raise ValueError("When num_rollouts > 1, rollout_batch_size must equal num_rollouts.")
-        if (self.prompts_per_step * self.num_rollouts) % self.rollout_batch_size != 0:
-            raise ValueError("prompts_per_step * num_rollouts must be divisible by rollout_batch_size.")
+    def validate_config(self) -> "Config":
+        if self.kl_estimator not in ("kl1", "kl2", "kl3"):
+            raise ValueError("kl_estimator must be one of: 'kl1', 'kl2', 'kl3'.")
         return self
 
 

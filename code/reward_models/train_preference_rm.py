@@ -13,19 +13,19 @@ This is the standard approach used in InstructGPT, Llama 2, and most RLHF
 pipelines. See Chapter 5 (Reward Models) of RLHF Book for theoretical background.
 
 Usage:
-    uv run python -m reward_models.train_preference_rm
-    uv run python -m reward_models.train_preference_rm --samples 5000 --epochs 1
+    uv run python -m reward_models.train_preference_rm --config reward_models/configs/preference_rm.yaml
 """
 
 import argparse
+import os
 import random
 from typing import Dict, List
 
 import torch
 import torch.nn.functional as F
-from datasets import Dataset, load_dataset
+from datasets import Dataset, load_dataset, load_from_disk
 from torch.utils.data import DataLoader
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, get_linear_schedule_with_warmup
 
 from reward_models.base import (
     BaseRewardModel,
@@ -36,21 +36,7 @@ from reward_models.base import (
     log_metrics,
     pad_sequences,
 )
-
-
-# =============================================================================
-# Configuration
-# =============================================================================
-
-DEFAULT_MODEL_ID = "Qwen/Qwen3-0.6B-Base"
-DEFAULT_DATASET = "argilla/ultrafeedback-binarized-preferences-cleaned"
-DEFAULT_SAMPLES = 2000
-DEFAULT_BATCH_SIZE = 2
-DEFAULT_GRAD_ACCUM = 4
-DEFAULT_MAX_LENGTH = 512
-DEFAULT_EPOCHS = 1
-DEFAULT_LR = 1e-6  # Lower LR for full fine-tuning (vs 1e-5 for LoRA)
-DEFAULT_SEED = 42
+from reward_models.config import Config, load_config
 
 
 # =============================================================================
@@ -68,28 +54,63 @@ def format_conversation(messages: List[Dict]) -> str:
     return "\n".join(result)
 
 
+def tokenize_messages(
+    tokenizer: AutoTokenizer,
+    messages: List[Dict],
+    max_length: int,
+    return_tensors: str | None = None,
+) -> Dict:
+    """Tokenize messages with the tokenizer chat template when available."""
+    if tokenizer.chat_template is not None:
+        return tokenizer.apply_chat_template(
+            messages,
+            tokenize=True,
+            add_generation_prompt=False,
+            max_length=max_length,
+            truncation=True,
+            return_dict=True,
+            return_tensors=return_tensors,
+        )
+
+    return tokenizer(
+        format_conversation(messages),
+        max_length=max_length,
+        truncation=True,
+        add_special_tokens=True,
+        return_tensors=return_tensors,
+    )
+
+
 def build_preference_dataset(
     tokenizer: AutoTokenizer,
-    dataset_name: str = DEFAULT_DATASET,
-    limit: int = DEFAULT_SAMPLES,
-    max_length: int = DEFAULT_MAX_LENGTH,
-    seed: int = DEFAULT_SEED,
+    config: Config,
 ) -> Dataset:
     """Build preference dataset from UltraFeedback.
 
     Each example contains:
     - chosen_ids: Token IDs for the chosen response
     - rejected_ids: Token IDs for the rejected response
-    """
-    random.seed(seed)
 
-    # Load dataset
-    raw = load_dataset(dataset_name, split="train")
+    Pairs that are token-identical after truncation carry no training signal
+    and are dropped, so the returned dataset can be smaller than `limit`.
+    """
+    random.seed(config.seed)
+
+    dataset_name = config.dataset_name
+    dataset_split = config.dataset_split
+    if os.path.exists(dataset_name):
+        raw = load_from_disk(dataset_name)
+        if hasattr(raw, "keys"):
+            raw = raw[dataset_split]
+    else:
+        raw = load_dataset(dataset_name, split=dataset_split)
 
     # Shuffle and limit
-    raw = raw.shuffle(seed=seed).select(range(min(limit, len(raw))))
+    raw = raw.shuffle(seed=config.seed).select(range(min(config.samples, len(raw))))
 
     records = []
+    max_length = config.max_length
+    dropped_identical = 0
     for ex in raw:
         # Extract prompt and responses
         prompt = ex.get("prompt", "")
@@ -99,34 +120,46 @@ def build_preference_dataset(
         # Handle different dataset formats
         if isinstance(chosen, list) and len(chosen) > 0:
             # Conversation format
-            chosen_text = format_conversation(chosen)
-            rejected_text = format_conversation(rejected)
+            chosen_messages = chosen
+            rejected_messages = rejected
         elif isinstance(chosen, str):
-            chosen_text = f"user: {prompt}\nassistant: {chosen}"
-            rejected_text = f"user: {prompt}\nassistant: {rejected}"
+            chosen_messages = [
+                {"role": "user", "content": prompt},
+                {"role": "assistant", "content": chosen},
+            ]
+            rejected_messages = [
+                {"role": "user", "content": prompt},
+                {"role": "assistant", "content": rejected},
+            ]
         else:
             continue
 
-        # Tokenize
-        chosen_tokens = tokenizer(
-            chosen_text,
-            max_length=max_length,
-            truncation=True,
-            add_special_tokens=True,
-        )
-        rejected_tokens = tokenizer(
-            rejected_text,
-            max_length=max_length,
-            truncation=True,
-            add_special_tokens=True,
+        chosen_tokens = tokenize_messages(tokenizer, chosen_messages, max_length)
+        rejected_tokens = tokenize_messages(tokenizer, rejected_messages, max_length)
+
+        # A long shared prompt can consume the whole max_length window, truncating
+        # both responses away and leaving identical token ids. The Bradley-Terry
+        # loss is a constant -log(0.5) with zero gradient on such pairs, so drop
+        # them rather than left-truncate (which would cut the prompt the reward
+        # head needs). See https://github.com/natolambert/rlhf-book/issues/503.
+        if chosen_tokens["input_ids"] == rejected_tokens["input_ids"]:
+            dropped_identical += 1
+            continue
+
+        records.append(
+            {
+                "chosen_ids": chosen_tokens["input_ids"],
+                "chosen_mask": chosen_tokens["attention_mask"],
+                "rejected_ids": rejected_tokens["input_ids"],
+                "rejected_mask": rejected_tokens["attention_mask"],
+            }
         )
 
-        records.append({
-            "chosen_ids": chosen_tokens["input_ids"],
-            "chosen_mask": chosen_tokens["attention_mask"],
-            "rejected_ids": rejected_tokens["input_ids"],
-            "rejected_mask": rejected_tokens["attention_mask"],
-        })
+    if dropped_identical:
+        print(
+            f"Dropped {dropped_identical} pairs whose chosen/rejected token ids were "
+            f"identical after truncation to max_length={max_length}"
+        )
 
     return Dataset.from_list(records)
 
@@ -147,17 +180,16 @@ def collate_fn(batch: List[Dict], tokenizer: AutoTokenizer) -> Dict[str, torch.T
 
 
 class PreferenceRewardModel(BaseRewardModel):
-    """Preference-based Reward Model with LoRA fine-tuning.
+    """Preference-based Reward Model with full fine-tuning.
 
     Architecture:
-    - Base LLM (e.g., Qwen3) with 4-bit quantization
-    - LoRA adapters on attention projections
+    - Base LLM (e.g., Qwen3) with FP32 parameters and BF16 CUDA autocast
     - Linear head mapping last hidden state to scalar reward
 
     The model outputs a single scalar reward for each sequence.
     """
 
-    def __init__(self, model_id: str = DEFAULT_MODEL_ID, **kwargs):
+    def __init__(self, model_id: str, **kwargs):
         super().__init__(model_id, head_dim=1, **kwargs)
 
     def get_reward(self, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
@@ -199,125 +231,272 @@ class PreferenceRewardModel(BaseRewardModel):
 
 
 # =============================================================================
+# Evaluation helpers
+# =============================================================================
+
+
+@torch.no_grad()
+def evaluate_preference_rm(
+    model: PreferenceRewardModel,
+    loader: DataLoader,
+    device: torch.device,
+    autocast_enabled: bool,
+) -> dict[str, float]:
+    """Evaluate Bradley-Terry loss and pairwise ranking metrics."""
+    model.eval()
+
+    total_loss = 0.0
+    total_correct = 0
+    total_pairs = 0
+    total_r_chosen = 0.0
+    total_r_rejected = 0.0
+    total_margin = 0.0
+
+    for batch in loader:
+        batch = {k: v.to(device) for k, v in batch.items()}
+
+        with torch.amp.autocast("cuda", dtype=torch.bfloat16, enabled=autocast_enabled):
+            loss, r_chosen, r_rejected = model(**batch)
+
+        batch_size = r_chosen.size(0)
+        margin = r_chosen - r_rejected
+
+        total_loss += loss.item() * batch_size
+        total_correct += (margin > 0).sum().item()
+        total_pairs += batch_size
+        total_r_chosen += r_chosen.sum().item()
+        total_r_rejected += r_rejected.sum().item()
+        total_margin += margin.sum().item()
+
+    n = max(1, total_pairs)
+    return {
+        "val/loss": total_loss / n,
+        "val/accuracy": total_correct / n,
+        "val/r_chosen_mean": total_r_chosen / n,
+        "val/r_rejected_mean": total_r_rejected / n,
+        "val/reward_margin": total_margin / n,
+    }
+
+
+# =============================================================================
 # Training
 # =============================================================================
 
 
-def train_preference_rm(
-    model_id: str = DEFAULT_MODEL_ID,
-    samples: int = DEFAULT_SAMPLES,
-    batch_size: int = DEFAULT_BATCH_SIZE,
-    grad_accum_steps: int = DEFAULT_GRAD_ACCUM,
-    max_length: int = DEFAULT_MAX_LENGTH,
-    epochs: int = DEFAULT_EPOCHS,
-    lr: float = DEFAULT_LR,
-    seed: int = DEFAULT_SEED,
-    use_wandb: bool = True,
-) -> PreferenceRewardModel:
+def train_preference_rm(config: Config) -> PreferenceRewardModel:
     """Train a preference-based reward model on UltraFeedback.
 
     Args:
-        model_id: HuggingFace model ID for base model
-        samples: Number of preference pairs to use
-        batch_size: Training batch size
-        grad_accum_steps: Gradient accumulation steps
-        max_length: Maximum sequence length
-        epochs: Number of training epochs
-        lr: Learning rate
-        seed: Random seed
-        use_wandb: Whether to log to wandb
+        config: Configuration object containing training parameters.
 
     Returns:
         Trained PreferenceRewardModel
     """
-    random.seed(seed)
-    torch.manual_seed(seed)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    random.seed(config.seed)
+    torch.manual_seed(config.seed)
+    device = torch.device(config.get_device())
 
     # Initialize wandb
     init_wandb(
         default_run_name="preference_rm",
-        config={
-            "model_id": model_id,
-            "samples": samples,
-            "batch_size": batch_size,
-            "grad_accum_steps": grad_accum_steps,
-            "max_length": max_length,
-            "epochs": epochs,
-            "lr": lr,
-        },
-        use_wandb=use_wandb,
+        config=config.model_dump(),
+        use_wandb=config.use_wandb,
     )
 
     # Load tokenizer
-    tokenizer = load_tokenizer(model_id)
+    tokenizer = load_tokenizer(config.model_id)
 
     # Build dataset
-    print(f"Building preference dataset with {samples} pairs...")
-    data = build_preference_dataset(tokenizer, limit=samples, max_length=max_length, seed=seed)
+    print(f"Building preference dataset with {config.samples} pairs...")
+    data = build_preference_dataset(tokenizer, config)
     print(f"Dataset size: {len(data)} pairs")
 
-    loader = DataLoader(
-        data,
-        batch_size=batch_size,
+    if config.val_ratio > 0.0:
+        splits = data.train_test_split(test_size=config.val_ratio, seed=config.seed, shuffle=True)
+        train_data = splits["train"]
+        val_data = splits["test"]
+    else:
+        train_data = data
+        val_data = None
+
+    print(f"Train size: {len(train_data)} pairs")
+    if val_data is not None:
+        print(f"Validation size: {len(val_data)} pairs")
+
+    train_loader = DataLoader(
+        train_data,
+        batch_size=config.batch_size,
         shuffle=True,
+        drop_last=len(train_data) > config.batch_size,
         collate_fn=lambda b: collate_fn(b, tokenizer),
     )
 
+    val_loader = (
+        DataLoader(
+            val_data,
+            batch_size=config.batch_size,
+            shuffle=False,
+            drop_last=False,
+            collate_fn=lambda b: collate_fn(b, tokenizer),
+        )
+        if val_data is not None
+        else None
+    )
+
     # Initialize model
-    print(f"Loading model: {model_id}")
-    model = PreferenceRewardModel(model_id=model_id).to(device)
+    print(f"Loading model: {config.model_id}")
+    model = PreferenceRewardModel(
+        model_id=config.model_id,
+        freeze_backbone=config.freeze_backbone,
+        device=device,
+    ).to(device)
     print(f"Trainable parameters: {model.count_trainable_params() / 1e6:.2f}M")
 
-    # Optimizer
-    optimizer = create_optimizer(model, lr)
+    # Optimizer and LR scheduler
+    optimizer = create_optimizer(model, config.lr)
+    total_optimizer_steps = -(-len(train_loader) // config.grad_accum_steps) * config.epochs
+    warmup_steps = int(total_optimizer_steps * config.warmup_ratio)
+
+    if config.lr_scheduler == "linear_decay":
+        scheduler = get_linear_schedule_with_warmup(
+            optimizer,
+            num_warmup_steps=warmup_steps,
+            num_training_steps=total_optimizer_steps,
+        )
+    elif config.lr_scheduler == "warmup_only":
+        scheduler = (
+            torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=0.1, total_iters=warmup_steps)
+            if warmup_steps > 0
+            else None
+        )
+
+    print(
+        f"LR scheduler: {config.lr_scheduler} | "
+        f"total optimizer steps: {total_optimizer_steps} | "
+        f"warmup steps: {warmup_steps}"
+    )
 
     # Mixed precision
     autocast_enabled = torch.cuda.is_available()
 
     # Training loop
     global_step = 0
-    for epoch in range(epochs):
+    grad_accum_steps = config.grad_accum_steps
+    eval_interval = config.eval_interval
+    for epoch in range(config.epochs):
         model.train()
-        total_loss = 0.0
-        total_correct = 0
-        total_pairs = 0
+        epoch_loss = 0.0
+        epoch_correct = 0
+        epoch_pairs = 0
         optimizer.zero_grad()
 
-        for step_idx, batch in enumerate(loader):
+        # Accumulators for logging per optimizer step
+        accum_loss = 0.0
+        accum_correct = 0
+        accum_pairs = 0
+        accum_r_chosen = 0.0
+        accum_r_rejected = 0.0
+        accum_microbatches = 0
+
+        for step_idx, batch in enumerate(train_loader):
             batch = {k: v.to(device) for k, v in batch.items()}
 
             with torch.amp.autocast("cuda", dtype=torch.bfloat16, enabled=autocast_enabled):
                 loss, r_chosen, r_rejected = model(**batch)
 
+            # Use a fixed grad_accum_steps divisor even for the final partial accumulation
+            # window. This can slightly under-weight the final update when len(train_loader)
+            # is not divisible by grad_accum_steps, but keeps the teaching example simple
+            # and follows the common constant-divisor convention.
+
             (loss / grad_accum_steps).backward()
 
-            if (step_idx + 1) % grad_accum_steps == 0 or (step_idx + 1) == len(loader):
+            # Accumulate metrics over the grad_accum window
+            accum_loss += loss.item()
+            correct = (r_chosen > r_rejected).sum().item()
+            accum_correct += correct
+            accum_pairs += r_chosen.size(0)
+            accum_r_chosen += r_chosen.mean().item()
+            accum_r_rejected += r_rejected.mean().item()
+            accum_microbatches += 1
+
+            epoch_loss += loss.item()
+            epoch_correct += correct
+            epoch_pairs += r_chosen.size(0)
+
+            if (step_idx + 1) % grad_accum_steps == 0 or (step_idx + 1) == len(train_loader):
                 optimizer.step()
+                if scheduler is not None:
+                    scheduler.step()
                 optimizer.zero_grad()
                 global_step += 1
 
-            total_loss += loss.item()
+                # Log averaged metrics over the full effective batch
+                n = max(1, accum_pairs)
+                mb = accum_microbatches
+                avg_loss = accum_loss / mb
+                acc = accum_correct / n
+                print(f"Epoch {epoch} step {global_step} | loss {avg_loss:.4f} | acc {acc:.3f}")
+                log_metrics(
+                    {
+                        "train/loss": avg_loss,
+                        "train/accuracy": acc,
+                        "train/r_chosen_mean": accum_r_chosen / mb,
+                        "train/r_rejected_mean": accum_r_rejected / mb,
+                        "train/reward_margin": (accum_r_chosen - accum_r_rejected) / mb,
+                        "train/lr": optimizer.param_groups[0]["lr"],
+                    },
+                    step=global_step,
+                )
 
-            # Accuracy: how often is r_chosen > r_rejected?
-            correct = (r_chosen > r_rejected).sum().item()
-            total_correct += correct
-            total_pairs += r_chosen.size(0)
+                # Run validation every N optimizer steps.
+                # evaluate_preference_rm() switches model to eval mode, so switch back to train after.
+                if (
+                    val_loader is not None
+                    and eval_interval > 0
+                    and global_step % eval_interval == 0
+                ):
+                    val_metrics = evaluate_preference_rm(
+                        model,
+                        val_loader,
+                        device,
+                        autocast_enabled,
+                    )
+                    print(
+                        f"Eval step {global_step} | "
+                        f"Val Loss: {val_metrics['val/loss']:.4f} | "
+                        f"Val Accuracy: {val_metrics['val/accuracy']:.3f} | "
+                        f"Val Margin: {val_metrics['val/reward_margin']:.4f}"
+                    )
+                    log_metrics(val_metrics, step=global_step)
+                    model.train()
 
-            if step_idx % 50 == 0:
-                acc = total_correct / max(1, total_pairs)
-                print(f"Epoch {epoch} step {step_idx} | loss {loss.item():.4f} | acc {acc:.3f}")
-                log_metrics({
-                    "loss": loss.item(),
-                    "accuracy": acc,
-                    "r_chosen_mean": r_chosen.mean().item(),
-                    "r_rejected_mean": r_rejected.mean().item(),
-                    "reward_margin": (r_chosen - r_rejected).mean().item(),
-                }, step=global_step)
+                # Reset accumulators
+                accum_loss = 0.0
+                accum_correct = 0
+                accum_pairs = 0
+                accum_r_chosen = 0.0
+                accum_r_rejected = 0.0
+                accum_microbatches = 0
 
-        avg_loss = total_loss / len(loader)
-        accuracy = total_correct / max(1, total_pairs)
+        avg_loss = epoch_loss / len(train_loader)
+        accuracy = epoch_correct / max(1, epoch_pairs)
         print(f"Epoch {epoch} | Loss: {avg_loss:.4f} | Accuracy: {accuracy:.3f}")
+
+        # Also run validation at epoch end, unless we already evaluated on this exact step.
+        should_run_epoch_eval = val_loader is not None and (
+            eval_interval <= 0 or global_step % eval_interval != 0
+        )
+
+        if should_run_epoch_eval:
+            val_metrics = evaluate_preference_rm(model, val_loader, device, autocast_enabled)
+            print(
+                f"Epoch {epoch} | Val Loss: {val_metrics['val/loss']:.4f} | "
+                f"Val Accuracy: {val_metrics['val/accuracy']:.3f} | "
+                f"Val Margin: {val_metrics['val/reward_margin']:.4f}"
+            )
+            log_metrics({**val_metrics, "epoch": epoch}, step=global_step)
+            model.train()
 
     finish_wandb()
     return model
@@ -343,13 +522,24 @@ for certain problems like breaking codes or simulating molecules."""
     bad_response = """Quantum computing is complicated. It uses physics.
 Computers are electronic devices. I don't really know much about it."""
 
-    # Format as conversations
-    good_text = f"user: {prompt}\nassistant: {good_response}"
-    bad_text = f"user: {prompt}\nassistant: {bad_response}"
-
-    # Tokenize
-    good_tokens = tokenizer(good_text, return_tensors="pt", max_length=512, truncation=True)
-    bad_tokens = tokenizer(bad_text, return_tensors="pt", max_length=512, truncation=True)
+    good_tokens = tokenize_messages(
+        tokenizer,
+        [
+            {"role": "user", "content": prompt},
+            {"role": "assistant", "content": good_response},
+        ],
+        max_length=512,
+        return_tensors="pt",
+    )
+    bad_tokens = tokenize_messages(
+        tokenizer,
+        [
+            {"role": "user", "content": prompt},
+            {"role": "assistant", "content": bad_response},
+        ],
+        max_length=512,
+        return_tensors="pt",
+    )
 
     with torch.no_grad():
         good_reward = model.get_reward(
@@ -379,32 +569,14 @@ def main():
         description="Train preference-based reward model on UltraFeedback",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--model-id", type=str, default=DEFAULT_MODEL_ID, help="Base model ID")
-    parser.add_argument("--samples", type=int, default=DEFAULT_SAMPLES, help="Number of preference pairs")
-    parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE, help="Batch size")
-    parser.add_argument("--grad-accum", type=int, default=DEFAULT_GRAD_ACCUM, help="Gradient accumulation steps")
-    parser.add_argument("--max-length", type=int, default=DEFAULT_MAX_LENGTH, help="Max sequence length")
-    parser.add_argument("--epochs", type=int, default=DEFAULT_EPOCHS, help="Training epochs")
-    parser.add_argument("--lr", type=float, default=DEFAULT_LR, help="Learning rate")
-    parser.add_argument("--seed", type=int, default=DEFAULT_SEED, help="Random seed")
-    parser.add_argument("--skip-demo", action="store_true", help="Skip scoring demo after training")
-    parser.add_argument("--no-wandb", action="store_true", help="Disable wandb logging")
+    parser.add_argument("--config", type=str, required=True, help="Path to YAML config file")
     args = parser.parse_args()
 
-    model = train_preference_rm(
-        model_id=args.model_id,
-        samples=args.samples,
-        batch_size=args.batch_size,
-        grad_accum_steps=args.grad_accum,
-        max_length=args.max_length,
-        epochs=args.epochs,
-        lr=args.lr,
-        seed=args.seed,
-        use_wandb=not args.no_wandb,
-    )
+    cfg = load_config(args.config)
+    model = train_preference_rm(config=cfg)
 
-    if not args.skip_demo:
-        tokenizer = load_tokenizer(args.model_id)
+    if not cfg.skip_demo:
+        tokenizer = load_tokenizer(cfg.model_id)
         demo_scoring(model, tokenizer)
 
 

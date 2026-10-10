@@ -2,17 +2,40 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <!-- Set the theme before first paint to avoid a flash of the wrong theme. -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('theme');
+        if (t !== 'light' && t !== 'dark') {
+          t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
+  <script src="theme.js" defer></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
   <link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="canonical" href="https://rlhfbook.com/library" />
+  <meta name="description" content="Compare model completions across RLHF, DPO, supervised finetuning, and post-training stages." />
 
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="RLHF Book" />
   <meta property="og:image" content="https://rlhfbook.com/assets/rlhf-book-share.png" />
   <meta property="og:image:width" content="1920" />
   <meta property="og:image:height" content="1080" />
-  <meta property="og:title" content="RLHF Model Library | RLHF Book by Nathan Lambert" />
-  <meta property="og:description" content="Compare supervised finetuned models with their RLHF/DPO counterparts across shared prompts." />
+  <meta property="og:title" content="RLHF &amp; Post-Training Model Library | RLHF Book by Nathan Lambert" />
+  <meta property="og:description" content="Compare model completions across RLHF, DPO, supervised finetuning, and post-training stages." />
   <meta property="og:url" content="https://rlhfbook.com/library" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="RLHF &amp; Post-Training Model Library | RLHF Book by Nathan Lambert" />
+  <meta name="twitter:description" content="Compare model completions across RLHF, DPO, supervised finetuning, and post-training stages." />
+  <meta name="twitter:image" content="https://rlhfbook.com/assets/rlhf-book-share.png" />
 
-  <title>RLHF Model Library | RLHF Book by Nathan Lambert</title>
+  <title>RLHF &amp; Post-Training Model Library | RLHF Book by Nathan Lambert</title>
 
   <style>
     /* Center the title block for this page only */
@@ -311,6 +334,60 @@
         grid-template-columns: 1fr;
       }
     }
+
+    /* ---- Dark-mode overrides (light rules above are unchanged) ---- */
+    :root[data-theme="dark"] .library-controls,
+    :root[data-theme="dark"] .completion-panel {
+      border-color: var(--color-border);
+      background: var(--color-bg-section);
+      box-shadow: 0 6px 18px var(--color-shadow);
+    }
+    :root[data-theme="dark"] .settings-header {
+      background: rgba(96, 165, 250, 0.08);
+      border-bottom-color: var(--color-border);
+    }
+    :root[data-theme="dark"] .settings-header:hover {
+      background: rgba(96, 165, 250, 0.14);
+    }
+    :root[data-theme="dark"] .settings-toggle,
+    :root[data-theme="dark"] .model-name a {
+      color: var(--color-link);
+    }
+    :root[data-theme="dark"] .button,
+    :root[data-theme="dark"] .filter-actions button,
+    :root[data-theme="dark"] .reroll-button,
+    :root[data-theme="dark"] .expand-toggle {
+      border-color: var(--color-link);
+      background: rgba(96, 165, 250, 0.14);
+      color: var(--color-link);
+    }
+    :root[data-theme="dark"] .filter-actions button:hover,
+    :root[data-theme="dark"] .reroll-button:hover,
+    :root[data-theme="dark"] .expand-toggle:hover {
+      background: rgba(96, 165, 250, 0.24);
+    }
+    :root[data-theme="dark"] .model-name,
+    :root[data-theme="dark"] .completion-meta {
+      color: var(--color-text-muted);
+    }
+    :root[data-theme="dark"] .completion-panel:focus-within {
+      box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.35);
+    }
+    :root[data-theme="dark"] .panel-divider {
+      background: linear-gradient(90deg, rgba(148, 163, 184, 0), rgba(148, 163, 184, 0.5), rgba(148, 163, 184, 0));
+    }
+    :root[data-theme="dark"] .copy-button {
+      background: var(--color-bg-elev);
+      border-color: var(--color-border-strong);
+      color: var(--color-text);
+    }
+    :root[data-theme="dark"] .copy-button:hover {
+      background: var(--color-border);
+    }
+    :root[data-theme="dark"] .empty-state {
+      border-color: var(--color-border);
+      background: rgba(96, 165, 250, 0.08);
+    }
   </style>
 
   <link rel="stylesheet" href="style.css" />
@@ -322,6 +399,10 @@
 
 </head>
 <body>
+<button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to dark mode" title="Switch to dark mode" aria-pressed="false">
+  <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+  <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+</button>
   <header id="title-block-header">
     <h1 class="title"><a href="https://rlhfbook.com/" style="color: inherit; text-decoration: none;">Reinforcement Learning from Human Feedback</a></h1>
     <p class="subtitle">A short introduction to RLHF and post-training focused on language models.</p>
@@ -336,9 +417,9 @@
   </p>
 
   <p>
-    The models used here are sourced from various open-source post-training pipelines from the Allen Institute for AI -- OLMo and Tülu models. 
+    The models used here are OLMo and Tülu models sourced from open-source post-training pipelines at the Allen Institute for AI.
     Overall, it is rare for intermediate models to be released at all. 
-    For each of the 18 models (9 pairs of SFT and RLHF models), we have generated 3 completions to a static set of 16 prompts. 
+    For each of the 18 models (9 SFT/RLHF pairs), we generated three completions for a static set of 16 prompts.
   </p>
   
   <p>
@@ -381,28 +462,28 @@
   <section id="citation" style="padding: 0 20px;">
     <h4 style="text-align: left; font-weight: normal;">Citation</h4>
     <p>If you found this useful for your research, please cite it!</p>
-    <pre style="text-align: left; font-size: small; color: #888;">@book{rlhf2026lambert,
-  author = {Nathan Lambert},
+    <p>For the web and arXiv version:</p>
+    <pre style="text-align: left; font-size: small; color: #888;">@misc{lambert2025reinforcementlearninghumanfeedback,
   title = {Reinforcement Learning from Human Feedback},
+  author = {Nathan Lambert},
+  year = {2025},
+  eprint = {2504.12501},
+  archivePrefix = {arXiv},
+  primaryClass = {cs.LG},
+  url = {https://arxiv.org/abs/2504.12501}
+}</pre>
+    <p>For the Manning edition:</p>
+    <pre style="text-align: left; font-size: small; color: #888;">@book{lambert2026reinforcement,
+  author = {Nathan Lambert},
+  title = {Reinforcement Learning from Human Feedback: Alignment and post-training of {LLMs}},
   year = {2026},
-  publisher = {Online},
-  url = {https://rlhfbook.com}
+  publisher = {Manning Publications},
+  isbn = {9781633434301},
+  url = {https://www.manning.com/books/reinforcement-learning-from-human-feedback}
 }</pre>
   </section>
-  <footer style="padding: 20px; text-align: center; margin-top: 2em;">
-    <div style="display: flex; justify-content: center; gap: 20px; align-items: center;">
-      <a href="https://github.com/natolambert/rlhf-book" target="_blank">
-        <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" alt="GitHub" style="width: 40px; height: 40px;">
-      </a>
-      <a href="https://arxiv.org/abs/2504.12501" target="_blank">
-        <img src="assets/arxiv.svg" alt="arXiv" style="width: 40px; height: 40px;">
-      </a>
-      <a href="https://www.manning.com/books/the-rlhf-book" target="_blank">
-        <img src="assets/manning.svg" alt="Manning" style="width: 40px; height: 40px;">
-      </a>
-    </div>
-    <p>&copy; 2024-2026 Nathan Lambert &middot; <a href="https://rlhfbook.com" style="color: #888; text-decoration: none;">rlhfbook.com</a></p>
-  </footer>
+  <!-- include: footer.html -->
+
 
   <script>
     const state = {

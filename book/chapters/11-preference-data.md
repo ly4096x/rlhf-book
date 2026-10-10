@@ -5,12 +5,16 @@
   Full license: https://github.com/natolambert/rlhf-book/blob/main/LICENSE-CHAPTERS
 -->
 ---
-prev-chapter: "What are Preferences"
+prev-chapter: "The Nature of Preferences"
 prev-url: "10-preferences"
 page-title: Preference Data
 search-title: "Chapter 11: Preference Data"
-next-chapter: "Synthetic Data & CAI"
+meta-description: "How preference datasets are designed, collected, filtered, and used for RLHF and post-training language models."
+next-chapter: "Synthetic Data & Distillation"
 next-url: "12-synthetic-data"
+lectures:
+  - video: "https://www.youtube.com/watch?v=Y2tv5vuaxFs&list=PLL1tdVxB1CpVpEtMHxwuR4uI4Lxjw00_y&index=13"
+    label: 'Lecture 8: On "Preferences" and Preference Data'
 ---
 
 # Preference Data
@@ -33,10 +37,10 @@ This chapter focuses on the *mechanics* of getting preference data and the best 
 
 ## Collecting Preference Data
 
-Getting the most out of human data involves iterative training of models, spending hundreds of thousands (or millions of dollars), highly detailed data instructions, translating ideas through data foundry businesses that mediate collection (or hiring a meaningful amount of annotators), and other challenges that add up. 
+Getting the most out of human data involves iterative training of models, spending hundreds of thousands (or millions) of dollars, highly detailed data instructions, translating ideas through data foundry businesses that mediate collection (or hiring a meaningful number of annotators), and other challenges that add up.
 This is not a process that should be taken lightly.
 Among all of the public knowledge on RLHF, collecting this data well is also one of the most opaque pieces of the pipeline. 
-At the time of writing, there are no open models with fully open human preference data released with the methods used to collect it (the largest and most recent human preference dataset released for models is the HelpSteer line of work from NVIDIA's Nemotron team [@wang2024helpsteer2p]).
+As of 2026, there are no open models with fully open human preference data released with the methods used to collect it (the largest recent human preference datasets released for models are in the HelpSteer line of work from NVIDIA's Nemotron team, including HelpSteer2-Preference and HelpSteer3-Preference [@wang2024helpsteer2p; @wang2025helpsteer3]).
 For these reasons, many who take up RLHF for new teams or projects omit human data and use AI feedback data, off-the-shelf reward models, or other methods to circumvent the need for curating data from scratch.
 
 An important assumption that is taken into the preference data collection process is that the best data for your training process is "on-policy" with respect to the previous checkpoint(s) of your training process.
@@ -46,7 +50,7 @@ In this case, the preference data could be collected on a checkpoint that has un
 The use of the term on-policy here is adapted from the reinforcement learning literature, where on-policy is a technical term implying that the data for a certain gradient update is collected from the most recent form of the policy.
 In preference data, on-policy is used in a slightly softer manner, where it means that the data is collected from the current family of models.
 Different models have different patterns in their generations, which makes preference data that is from a closely related model more robust in the crucial areas of optimization.
-Research has shown that using this on-policy data, rather than other popular datasets that aggregate completions from pools of popular models on platforms like HuggingFace, is particularly important for effective RLHF training [@malik2025rewardbench].
+Research has shown that using this on-policy data, rather than other popular datasets that aggregate completions from pools of popular models on platforms like Hugging Face, is particularly important for effective RLHF training [@malik2025rewardbench].
 
 This necessity for on-policy data is not well documented, but many popular technical reports, such as early versions of Claude or Llama 2, showcase multiple training stages with RLHF being useful for final performance, which mirrors this well.
 The same uncertainty applies for the popular area of AI feedback data -- the exact balance between human and AI preference data used for the latest AI models is unknown.
@@ -65,17 +69,17 @@ An example interface is shown below from Anthropic's early and foundational RLHF
 In the figure shown below, @fig:preference-interface, a data labeler has a conversation with the model and must choose a preference between two possible answers, at the bottom highlighted in purple.
 In addition, the labeler is given the potential to include more notes on the conversation or a general rating of the conversation quality (potentially spread across multiple tasks, as seen in the top left).
 
-![An example of one of the earliest preference data collection interface, from Anthropic's research. Bai et al. 2022. The actual conversation is a toy conversation around what is a good example conversation for data collection. License CC-BY.](images/anthropic-interface.png){#fig:preference-interface .center}
+![An example of one of the earliest preference data collection interfaces, from Anthropic's research. Bai et al. 2022. The actual conversation is a toy conversation around what is a good example conversation for data collection. License CC-BY.](images/anthropic-interface.png){#fig:preference-interface .center}
 
 This first example is a *training-data only* interface, where the goal is to collect rich metadata along with the conversation. 
-Now that these models are popular, applications often expose interfaces for collecting preference directly to the users during everyday use, much like how other technology products will A/B test new features in small subsets of the production usage.
+Now that these models are popular, applications often expose interfaces for collecting preferences directly from users during everyday use, much like how other technology products will A/B test new features in small subsets of the production usage.
 It depends on the application whether this preference data is used directly to train the future models, or if it is used just as an evaluation of models' performance relative to each other.
 An example interaction of this form is shown below in @fig:preference-chatgpt for an earlier version of ChatGPT.
 
 ![Example preference data collection interface from when I was served two completions from different ChatGPT beta models. The actual completions are very close in content, showing how collecting preference data can be noisy and difficult to get exactly right.](images/chatgpt-ab-test.jpeg){#fig:preference-chatgpt .center}
 
 This style of interface is used extensively across the industry, such as for *evaluation* of models given the same format.
-A popular public option to engage with models in this way is Arena (formerly ChatBotArena) [@chiang2024chatbot], which includes the option of a "tie" between models:
+A popular public option to engage with models in this way is Arena (formerly Chatbot Arena) [@chiang2024chatbot], which includes the option of a "tie" between models:
 
 ![Example preference data collection interface from an early version of the popular Arena benchmark.](images/chatbotarena.png){#fig:chatbotarena .center}
 
@@ -106,16 +110,16 @@ One simple way to collect ratings is to score a *single* completion on a 1-5 sca
 
 With multiple completions to the same prompt, a simple way to make preference data would be to choose the highest rated completion and pair it randomly with a lower scored completion (as done for UltraFeedback and derivative works [@cui2023ultrafeedback]).
 
-Although, the most common technique for collecting preferences is to use a Likert scale for relative rankings [@likert1932technique], which asks users to select which response they prefer in a group of completions.
-For example, a 5 point Likert scale would look like the following (note that, yes, a Likert scale uses a single integer to record the ranking, much like a rating, so it's how the data is structured that is the core difference in the two ways of collecting preference data):
+However, the most common technique for collecting preferences is to use a Likert scale for relative rankings [@likert1932technique], which asks users to select which response they prefer in a group of completions.
+For example, a 5-point Likert scale would look like the following (note that, yes, a Likert scale uses a single integer to record the ranking, much like a rating, so it's how the data is structured that is the core difference in the two ways of collecting preference data):
 
 | A$>>$B | A$>$B | Tie | B$>$A | B$>>$A |
 |:------:|:-----:|:-----:|:-----:|:------:|
 | 1    | 2   | 3   | 4   | 5    |
 
-Table: An example 5-wise Likert scale between two responses, A and B. {#tbl:likert5}
+Table: An example 5-point Likert scale between two responses, A and B. {#tbl:likert5}
 
-Some early RLHF for language modeling works uses an 8-step Likert scale with levels of preference between the two responses [@bai2022training]. 
+Some early RLHF for language modeling works use an 8-point Likert scale with levels of preference between the two responses [@bai2022training]. 
 An even scale removes the possibility of ties:
 
 
@@ -123,33 +127,33 @@ An even scale removes the possibility of ties:
 |:-------:|:-----:|:-----:|:-----:|:------:|:-----:|:-----:|:-------:|
 | 1     | 2   | 3   | 4   | 5    | 6   | 7   | 8     |
 
-Table: An example 8-wise Likert scale between two responses, A and B. {#tbl:likert8}
+Table: An example 8-point Likert scale between two responses, A and B. {#tbl:likert8}
 
 In this case [@bai2022training], as in other works, this information is still reduced to a binary signal for the training of a reward model.
 
-### Multi-turn Data
+### Multiturn Data
 
 In practice, core questions often arise over how to parse and collect multi-turn data -- simply conversations with multiple related prompts.
 In a real-world interaction, normally a piece of preference data is only collected on the "final" prompt, but there are scenarios where preferences can be given on every response.
 When preferences are given on every response, the conversation traditionally continues with the "chosen" answer.
 At training time, it is common to include the training data for every turn of the conversation as a "single prompt," where the model can learn from completing it.
 This can effectively unroll longer conversations into many training prompts, but needs to be done carefully to not bias the training data.
-Many research questions are still emerging, such as if the person labeling the preference on the generations should be the same as the person who creates the prompt (to avoid sycophancy), and other variables that are difficult to control for in data collection (question [inspired by John Schulman](https://x.com/johnschulman2/status/1917483351436582953)).
+Many research questions are still emerging around variables that are difficult to control for in data collection, including a question [inspired by John Schulman](https://x.com/johnschulman2/status/1917483351436582953) about whether the person labeling the preference on the generations should be the same as the person who creates the prompt (to avoid sycophancy).
 If the prompt creator cannot label the preference data, multi-turn is not really practical due to the need for conversations to continue in real-time -- sometimes for preference data the curation of prompts is a different problem than comparing responses (also due to the work of maintaining active endpoints for models).
 For training, all of the previous turns in the conversation are masked from the loss, as discussed with instruction fine-tuning.
 
 ### Structured Preference Data
 
 In many applications of RLHF and post-training, preference data can be created *automatically* due to innate structures of the data -- i.e. the domains make automatic checks of correctness or preference possible.
-For example, in mathematical reasoning domains the chosen response can be a correct answer and the rejected an incorrect answer.
+For example, in mathematical reasoning domains the chosen response can be a correct answer and the rejected response can be an incorrect answer.
 Another example is in precise instruction following, such as the evaluation IFEval [@zhou2023instructionfollowingevaluationlargelanguage], where prompts take the form of:
 
 > **Prompt**: Write me a short poem about a goldfish. **Start each sentence with the letter g.**
 
 The second part of this query is called the constraint, and the preference data could be constructed with an example in the chosen column that follows the constraint.
-Constructing this preference data, which would be included as *synthetic* preference data, involves prompting the same model (or multiple models) twice. Once with the constraint included and once without.
+Constructing this preference data, which would be included as *synthetic* preference data, involves prompting the same model (or multiple models) twice: once with the constraint included and once without.
 
-For example, prompting GPT-4.5-Preview with both of these gives the following.
+For example, prompting GPT-4.5-Preview with the constraint gives the following.
 
 > **Prompt**: Write me a short poem about a goldfish. Start each sentence with the letter g.
 >
@@ -182,7 +186,7 @@ These have been shown to enable preference fine-tuning to have meaningful perfor
 
 #### Alternatives
 
-There are multiple other ways to collect useful feedback data for RLHF that have not been pursued in as great of detail. 
+There are multiple other ways to collect useful feedback data for RLHF that have not been pursued in as much detail.
 Examples include using single data points with directional labels, e.g. as shown from Ai2 playground above in @fig:up-down, directly with algorithms designed for single direction signals like Kahneman-Tversky Optimization (KTO) [@ethayarajh2024kto].
 Other algorithms have been proposed with different types of feedback signals such as fine-grained feedback, e.g. at the token level [@wu2024fine], or natural language feedback, e.g. by writing responses [@chen2024learning], to provide a richer learning signal in exchange for a more complicated data collection setup.
 
@@ -193,7 +197,7 @@ The following describes the experience of getting preference data when the field
 Over time, these processes will become far more automated and efficient (especially with AI feedback being used for a larger portion of the process).
 
 The first step is sourcing the vendor to provide data (or one's own annotators). 
-Much like acquiring access to cutting-edge Nvidia GPUs, getting access to data providers in the peak of AI excitement is also a who-you-know game -- those who can provide data are supply-limited. 
+Much like acquiring access to cutting-edge NVIDIA GPUs, getting access to data providers in the peak of AI excitement is also a who-you-know game -- those who can provide data are supply-limited.
 If you have credibility in the AI ecosystem, the best data companies will want you on their books for public image and long-term growth options. 
 Discounts are often also given on the first batches of data to get training teams hooked.
 
@@ -201,14 +205,14 @@ If you're a new entrant in the space, you may have a hard time getting the data 
 Data vendors are known to prioritize large budget line-items and new customers that have an influential brand or potential for large future revenue.
 This is, in many business ways, natural, as the data foundry companies are often supply-limited in their ability to organize humans for effective data labelling.
 
-On multiple occasions, I've heard of data companies not delivering their data as contracted without the customer threatening legal or financial action against them for breach of contract. 
-Others have listed companies I work with as customers for PR even though we never worked with them, saying they "didn't know how that happened" when reaching out. 
+In a recurring unfortunate pattern, data companies have not delivered data as contracted without the customer threatening legal or financial action against them for breach of contract.
+Others have listed companies as customers for PR even though they never worked with them, saying they "didn't know how that happened" when called out.
 There are plenty of potential bureaucratic or administrative snags through the process. 
 For example, the default terms on the contracts often prohibit the open sourcing of artifacts after acquisition in some fine print.
 
 Once a contract is settled, the data buyer and data provider agree upon instructions for the task(s) purchased. 
 There are intricate documents with extensive details, corner cases, and priorities for the data. 
-A popular example of data instructions is the one that [OpenAI released for InstructGPT](https://docs.google.com/document/d/1MJCqDNjzD04UbcnVZ-LmeXJ04-TKEICDAepXyMCBUb8/edit#heading=h.21o5xkowgmpj) [@ouyang2022training].
+A popular example of data instructions is the one that [OpenAI released for InstructGPT](https://rlhfbook.com/assets/instructgpt-instructions.pdf) [@ouyang2022training].
 
 Depending on the domains of interest in the data, timelines for when the data can be labeled or curated vary. 
 High-demand areas like mathematical reasoning or coding must be locked into a schedule weeks out. 
@@ -220,14 +224,14 @@ If the data cannot be easily slotted into an existing RLHF data pipeline, it'll 
 Collecting data that cannot be seamlessly integrated into training pipelines often becomes stale and a waste of resources.
 
 The data is delivered in weekly batches with more data coming later in the contract. 
-For example, when we bought preference data for on-policy models we were training at HuggingFace, we had a 6 week delivery period. 
-The first weeks were for further calibration and the later weeks were when we hoped to most improve our model.
+For example, a typical preference data contract might span a 6-week delivery period.
+The first weeks are for further calibration and the later weeks are when teams hope to most improve their model.
 
 ![Overview of the multi-batch cycle for obtaining human preference data from a vendor. The ramp up period allows a narrowing of goals and methodology in order to create the best possible data. It is expected that a larger proportion of the data from the earlier batches will have to be thrown out due to quality issues. This is one timeline example for a smaller data contract (~$500K) and much larger data contracts can vary substantially.](images/pref-data-timeline.png){#fig:preferences .center}
 
-The goal is that by week 4 or 5 we can see the data improving our model. 
+The goal is that by week 4 or 5 the data is visibly improving the model. 
 This is something some frontier models have mentioned, such as the 14 stages in the Llama 2 data collection [@touvron2023llama], but it doesn't always go well. 
-At HuggingFace, trying to do this for the first time with human preferences, we didn't have the RLHF preparedness to get meaningful bumps on our evaluations. The last weeks came and we were forced to continue to collect preference data generating from endpoints we weren't confident in.
+As an example, a team trying this for the first time with human preferences may not have the RLHF preparedness to get meaningful bumps on their evaluations. The last weeks come and they are forced to continue collecting preference data generated from endpoints they aren't confident in.
 
 After the data is all in, there is plenty of time for learning and improving the model. 
 Data acquisition through these vendors works best when viewed as an ongoing process of achieving a set goal. 
@@ -237,7 +241,7 @@ Not many organizations have the bandwidth and expertise to make full use of huma
 
 Note that this section *does not* mirror the experience for buying human-written instruction data, where the process is less of a time crunch.
 Early post-training processes were built around the first stage of training being heavily driven by carefully crafted, human answers to a set of prompts.
-This stage of data is not subject to the on-policy restrictions for multiple reasons: Instruction data is used directly on top of a base model, so on-policy doesn't really apply; the loss-function for instruction fine-tuning doesn't need the contrastive data of preference fine-tuning; and other structural advantages.
+This stage of data is not subject to the on-policy restrictions for multiple reasons: Instruction data is used directly on top of a base model, so on-policy doesn't really apply; the loss-function for instruction fine-tuning doesn't need the contrastive data of preference fine-tuning.
 Today, the primary other focus of human data is in generating prompts for post-training -- which dictate the training distribution of topics for the model -- or on challenging tasks at the frontier of model performance.
 More of these data trade-offs are discussed in Chapter 12 on Synthetic Data.
 
@@ -245,10 +249,10 @@ More of these data trade-offs are discussed in Chapter 12 on Synthetic Data.
 
 While preference data is essential, it's also known to be prone to many subtle biases that can make its collection error-prone.
 These biases are so common, e.g. prefix bias (where the beginning of a completion disproportionately drives the preference) [@kumar2025detecting], that they can easily be passed to the final model [@bharadwaj2025flatteryflufffogdiagnosing] (and especially as we know that models are only as good as their data).
-These issues are often subtle and vary in how applicable interventions to mitigate them are.
+These issues are often subtle, and the effectiveness of interventions varies widely across them.
 For many, such as sycophancy (over-agreeing with the user’s stated beliefs or flattering them, even when it reduces truthfulness) [@sharma2023towards], they reflect issues within humans that are often outside of the labeling criteria that one will think of providing to the annotation partner or labelers.
 Others, such as verbosity [@singhal2023long] [@bu2025beyond] or formatting habits [@zhang2024lists], emerge for a similar reason, but they are easier to detect and mitigate in training.
-Mitigating these subtle biases in data is the difference between good or great preference data, and therefore good or great RLHF training.
+Mitigating these subtle biases in data is the difference between good and great preference data, and therefore good and great RLHF training.
 
 ## Open Questions in RLHF Preference Data
 
@@ -263,7 +267,6 @@ Despite the maturity of RLHF as a core method across the field, there are still 
 Some are enumerated below:
 
 - **Data collection contexts**: Can data involving preferences collected in a professional setting mirror the intent of researchers designing an experiment or provide suitable transfer to downstream users?  How does this compare to volunteer workers? How does context inform preferences, how does this data impact a downstream model, how can the impact of a user interface be measured in data? How does repetitive labeling of preference data shift one's preferences?  Do professional crowd-workers, instructed to follow a set of preferences, follow the instructions or their innate values? 
-- **Type of feedback**: Does the default operating method of RLHF, pairwise preferences capture preferences in its intended form?  Can comparisons in RLHF across the same data be made with the default comparisons versus advanced multi-axis feedback mechanisms [@wu2024fine]? What types of comparisons would reflect how humans communicate preferences in text?
+- **Type of feedback**: Does the default operating method of RLHF, pairwise preferences, capture preferences in its intended form?  Can comparisons in RLHF across the same data be made with the default comparisons versus advanced multi-axis feedback mechanisms [@wu2024fine]? What types of comparisons would reflect how humans communicate preferences in text?
 - **Population demographics**: Who is completing the data? Is a diverse population maintained? How does a lack of diversity emerge as measurable impacts on the model? What is a minimum number of people required to suitably represent a given population? How are instances of preference annotator disagreement treated -- as a source of noise, or a signal?
 - **Are the Preferences Expressed in the Models?** In the maturation of RLHF and related approaches, the motivation of them -- to align models to abstract notions of human preference -- has drifted from the practical use -- to make the models more effective to users. A feedback loop that is not measurable due to the closed nature of industrial RLHF work is the check to see if the behavior of the models matches the specification given to the data annotators during the process of data collection. We have limited tools to audit this, such as the Model Spec from OpenAI [@openai2024modelspec] that details *what they want their models to do*, but we don't know exactly how this translates to data collection.
-

@@ -19,20 +19,13 @@ make files    # Copy assets to build output
 ### Known Conversion Issues
 
 With the nested structure used for the website the section links between chapters in the PDF are broken.
-We are opting for this in favor of a better web experience, but best practice is to not put any links to `rlhfbook.com` within the markdown files. Non-html versions will not be well suited to them.
+We are opting for this in favor of a better web experience, but best practice is to not put any links to `rlhfbook.com` within the Markdown files. Non-HTML versions will not be well suited to them.
 
 ### Common Failures When Editing with Coding Agents
 
-Coding agents (Claude, Cursor, etc.) often introduce Unicode characters that break the Pandoc PDF build with errors like `Cannot decode byte '\xe2': Data.Text.Encoding: Invalid UTF-8 stream`. Watch for:
+Valid UTF-8 Unicode punctuation, including curly quotes and em dashes, is supported by the book build. An error such as `Cannot decode byte '\xe2': Data.Text.Encoding: Invalid UTF-8 stream` indicates malformed or incorrectly encoded input, not the presence of valid Unicode punctuation.
 
-- **Curly apostrophes** (`'` U+2019) instead of straight apostrophes (`'`) - common in "don't", "it's", possessives
-- **Em-dashes** (`—` U+2014) and **en-dashes** (`–` U+2013) instead of double-hyphens (`--`)
-- **Non-breaking spaces** (`\xa0` U+00A0) instead of regular spaces
-- **Curly quotes** (`"` `"` U+201C/U+201D) instead of straight quotes (`"`)
-
-To find these: `xxd book/chapters/filename.md | grep -i 'e2 80\|c2 a0'`
-
-To fix: `python3 -c "content = open('file.md').read(); content = content.replace('\u2019', \"'\").replace('\u2014', '--'); open('file.md', 'w').write(content)"`
+Check a file's encoding with `file -I book/chapters/filename.md` or validate it with `iconv -f UTF-8 -t UTF-8 book/chapters/filename.md >/dev/null`. Keep source files as UTF-8; the PDF build normalizes TeX output where needed.
 
 ## Installing
 
@@ -80,7 +73,40 @@ brew install make
 brew install pandoc-crossref
 ```
 
-Or, fork a process from the [github action](https://github.com/natolambert/rlhf-book/blob/main/.github/workflows/static.yml) that auto-builds new versions on MacOS.
+For the arXiv source bundle, also make sure the Python runner and LaTeX
+packages used by the PDF template are available:
+
+```sh
+brew install uv
+```
+
+Small TeX install:
+
+```sh
+brew install --cask basictex
+sudo tlmgr update --self
+sudo tlmgr install fvextra tcolorbox pdfcol
+```
+
+Fuller TeX install alternative:
+
+```sh
+brew install --cask mactex-no-gui
+```
+
+Build the arXiv-ready bundle from the repository root:
+
+```sh
+make -B latex
+```
+
+The generated source bundle is written to `build/arxiv.zip`.
+
+The arXiv target copies only images referenced by the generated `book.tex`.
+If arXiv reports an oversized image, resize the source file in `book/images`
+below arXiv's pixel-count limit and rebuild with `make -B latex`.
+
+Or, reuse the [GitHub Actions workflow](https://github.com/natolambert/rlhf-book/blob/main/.github/workflows/static.yml) that auto-builds new versions on macOS.
 
 ## Folder Structure
 
@@ -92,7 +118,7 @@ book/
 ├── templates/    # Pandoc templates for each output format
 ├── scripts/      # Build utilities
 ├── data/         # Library data (JSON)
-└── preorder/     # Pre-order redirect page
+└── preorder/     # Order redirect page
 ```
 
 ## Setup
@@ -121,7 +147,7 @@ You can find the list of all available keys on
 
 ## Creating Chapters
 
-Creating a new chapter is as simple as creating a new markdown file in the *chapters/* folder;
+Creating a new chapter is as simple as creating a new Markdown file in the *chapters/* folder;
 you'll end up with something like this:
 
 ```
@@ -134,7 +160,7 @@ chapters/04-references.md
 Pandoc and Make will join them automatically ordered by name; that's why the numeric prefixes are
 being used.
 
-All you need to specify for each chapter at least one title:
+For each chapter, specify at least one title:
 
 ```md
 # Introduction
@@ -151,7 +177,7 @@ This is the second subsection.
 ```
 
 Each title (*#*) will represent a chapter, while each subtitle (*##*) will represent a chapter's
-section. You can use as many levels of sections as markdown supports.
+section. You can use as many levels of sections as Markdown supports.
 
 ### Manual control over page ordering
 
@@ -236,7 +262,7 @@ If you want to resize the image, you may use this syntax, available since Pandoc
 
 ### Insert a table
 
-Use markdown table, and use the `Table: <Your table description>` syntax to add a caption:
+Use a Markdown table, and use the `Table: <Your table description>` syntax to add a caption:
 
 ```md
 | Index | Name |
@@ -256,7 +282,7 @@ Wrap a LaTeX math equation between `$` delimiters for inline (tiny) formulas:
 This, $\mu = \sum_{i=0}^{N} \frac{x_i}{N}$, the mean equation, ...
 ```
 
-Pandoc will transform them automatically into images using online services.
+Pandoc renders equations as MathJax in HTML, MathML in EPUB, and native LaTeX in PDF.
 
 If you want to center the equation instead of inlining it, use double `$$` delimiters:
 
@@ -272,16 +298,16 @@ Originally, this template used LaTeX labels for auto numbering on images, tables
 sections, like this:
 
 ```md
-Please, admire the gloriousnes of Figure \ref{seagull_image}.
+Please, admire the gloriousness of Figure \ref{seagull_image}.
 
 ![A cool seagull.\label{seagull_image}](images/seagull.png)
 ```
 
-**However, these references only works when exporting to a LaTeX-based format (i.e. PDF, LaTeX).**
+**However, these references only work when exporting to a LaTeX-based format (i.e. PDF, LaTeX).**
 
-In case you need cross references support on other formats, this template now support cross
-references using [Pandoc filters](https://pandoc.org/filters.html). If you want to use them, use a
-valid plugin and with its own syntax.
+In case you need cross-reference support in other formats, this template now supports
+cross-references using [Pandoc filters](https://pandoc.org/filters.html). If you want to use them,
+use a valid plugin with its own syntax.
 
 Using [pandoc-crossref](https://github.com/lierdakil/pandoc-crossref) is highly recommended, but
 there are other alternatives which use a similar syntax, like
@@ -324,9 +350,9 @@ Check the desired filter settings and usage for more information
 
 ### Content filters
 
-If you need to modify the MD content before passing it to pandoc, you may use `CONTENT_FILTERS`. By
-setting this makefile variable, it will be passed to the markdown content before passing it to
-pandoc. For example, to replace all occurrences of `@pagebreak` with
+If you need to modify the MD content before passing it to Pandoc, you may use `CONTENT_FILTERS`. By
+setting this Makefile variable, it will be passed to the Markdown content before passing it to
+Pandoc. For example, to replace all occurrences of `@pagebreak` with
 `<div style="page-break-before: always;"></div>` you may use a `sed` filter:
 
 ```
@@ -343,8 +369,8 @@ CONTENT_FILTERS = \
 
 ## Output
 
-This template uses *Makefile* to automatize the building process. Instead of using the *pandoc cli
-util*, we're going to use some *make* commands.
+This template uses a *Makefile* to automate the build process. Instead of using the *Pandoc CLI
+utility*, we're going to use some *make* commands.
 
 ### Export to PDF
 
@@ -394,15 +420,15 @@ The generated file(s) will be placed in *build/docx*.
 
 ### Extra configuration
 
-If you want to configure the output, you'll probably have to look the
-[Pandoc Manual](http://pandoc.org/MANUAL.html) for further information about pdf (LaTeX) generation,
-custom styles, etc, and modify the Makefile file accordingly.
+If you want to configure the output, you'll probably have to look at the
+[Pandoc Manual](http://pandoc.org/MANUAL.html) for further information about PDF (LaTeX) generation,
+custom styles, etc., and modify the Makefile accordingly.
 
 ### Templates
 
-Output files are generated using [pandoc templates](https://pandoc.org/MANUAL.html#templates). All
-templates are located under the `templates/` folder, and may be modified as you will. Some basic
-format templates are already included on this repository, in case you need something to start
+Output files are generated using [Pandoc templates](https://pandoc.org/MANUAL.html#templates). All
+templates are located under the `templates/` folder, and may be modified as you wish. Some basic
+format templates are already included in this repository, in case you need something to start
 with.
 
 ## References

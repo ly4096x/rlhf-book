@@ -25,6 +25,10 @@ wheels/
 venv/
 ENV/
 
+# Local env files
+.env
+.envrc
+
 # uv
 .uv/
 uv.lock
@@ -43,13 +47,14 @@ uv.lock
 # Model checkpoints and outputs
 checkpoints/
 outputs/
+rejection_sampling/output/
 wandb/
 *.pt
 *.pth
 *.bin
 *.safetensors
 
-# HuggingFace cache (don't commit downloaded models)
+# Hugging Face cache (don't commit downloaded models)
 .cache/
 
 # OS
