@@ -1,4 +1,4 @@
-<!-- source-commit: 02c6d49 -->
+<!-- source-commit: eecc49e -->
 <!--
   Copyright (c) 2025-2026 Nathan Lambert.
   Licensed under CC BY-NC-SA 4.0:
@@ -8,15 +8,19 @@
 ---
 prev-chapter: "定义"
 prev-url: "appendix-a-definitions"
-page-title: "附录 B：风格与信息"
-search-title: "附录 B：风格与信息"
+page-title: "附录 B：超越“仅仅是风格”"
+search-title: "附录 B：超越“仅仅是风格”"
+meta-description: "RLHF 与 post-training 如何塑造 language model 的风格、校准以及信息呈现方式相关的问题。"
 next-chapter: "实践问题"
 next-url: "appendix-c-practical"
+lectures:
+  - video: "https://www.youtube.com/watch?v=y04JhXpiI4s&list=PLL1tdVxB1CpVpEtMHxwuR4uI4Lxjw00_y"
+    label: "第九讲：过度优化与 RLHF 的坏名声"
 ---
 
-# 风格与信息
+# 超越“仅仅是风格”
 
-RLHF 早期的发展使其背负了"仅仅是风格迁移"的名声，以及其他对 RLHF 如何操控输出信息呈现方式的严苛批评。
+RLHF 早期的发展使其背负了"仅仅是风格迁移"的名声；其他严苛的批评则集中在 RLHF 如何操控输出信息呈现方式上。
 本附录解释了为什么风格是理解 RLHF 所提供价值的核心，以及为什么它对模型能力和用户体验都能产生积极影响。
 
 将 RLHF 视为单纯风格迁移的观念，从两个方面阻碍了 RLHF 的叙事发展。
@@ -30,8 +34,8 @@ RLHF 早期的发展使其背负了"仅仅是风格迁移"的名声，以及其�
 Llama 3 Instruct 模型在 Arena 上得分极高，普遍认为这是因为它们拥有更有趣的个性——相比同时代的其他模型，它们更简洁、更机智。
 无论许多 LLM 用户所痴迷的 benchmark 得分如何，如果 RLHF 能够让 language model 变得更有趣，那本身就是有价值的。
 
-在本章中，"话唠性"（chattiness）一词用于涵盖经 RLHF 训练的模型回复长度不断增加的现象，但它也涵盖了大量使用 markdown、表情符号以及以项目符号列表格式化答案等技巧。
-为了使本章的讨论更加具体，下面展示了同一 Tülu 3 系列中两个模型的示例补全内容——一个仅进行了 instruction fine-tuning，第二个则通过长度控制 DPO 应用了偏好 fine-tuning。
+在本附录中，"话唠性"（chattiness）一词用于涵盖经 RLHF 训练的模型回复长度不断增加的现象，但它也涵盖了大量使用 Markdown、表情符号以及以项目符号列表格式化答案等技巧。
+为了使本附录的讨论更加具体，下面展示了同一 Tülu 3 系列中两个模型的示例补全内容——一个仅进行了 instruction fine-tuning，第二个则通过长度控制 DPO 应用了偏好 fine-tuning。
 首先是对 prompt `What is reinforcement learning from human feedback?` 进行 instruction-tuned 的补全（具体模型为 [Llama 3.1 Tulu 3 70B SFT](https://huggingface.co/allenai/Llama-3.1-Tulu-3-70B-SFT)）[@lambert2024t]：
 
 ```text
@@ -44,7 +48,7 @@ By using human feedback, reinforcement learning can address some of these issues
 However, reinforcement learning from human feedback faces several challenges, such as the high cost of obtaining human feedback, subjective and inconsistent feedback, scaling issues, and methods for efficient and effective integration of human feedback into learning algorithms. Despite these challenges, the research in this area has shown promising results in various applications, including robotics, video games, prosthetics control, natural language processing, and many more.
 ```
 
-以及来自 [Llama 3.1 Tulu 3 70B DPO](https://huggingface.co/allenai/Llama-3.1-Tulu-3-70B-DPO) 经过 RLHF 后的补全内容：
+以及来自 [Llama 3.1 Tulu 3 70B DPO](https://huggingface.co/allenai/Llama-3.1-Tulu-3-70B-DPO) 的 post-RLHF 补全内容：
 ```text
 Reinforcement learning from human feedback (RLHF) is a subset of reinforcement learning (RL) where the rewards that guide the learning process are provided by humans, rather than a pre-specified numerical reward function. This is particularly useful in situations where it is hard or infeasible to design a suitable reward function, or where the desired performance involves subjective judgments that humans are uniquely equipped to provide.
 
@@ -77,7 +81,7 @@ Using human feedback introduces some specific challenges:
 
 1. **Scalability:** Human feedback is time-consuming and expensive to collect, and it's hard to scale to complex or high-dimensional tasks.
 2. **Bias and Noise:** Human feedback can be noisy, inconsistent, and biased, leading to suboptimal learning outcomes.
-3. **Alignment:** Ensuring that the reinforcement learning agent aligns with the true preferences of the human evaluator(s) and not just the superficial feedback, is difficult.
+3. **Alignment:** Ensuring that the reinforcement learning agent aligns with the true preferences of the human evaluator(s) and not just the superficial feedback is difficult.
 4. **Safety and Misuse:** There can be concerns about the safety and ethical implications of using potentially flawed human feedback, especially if the feedback process is corrupted or gamed.
 
 Researchers are actively working on techniques to mitigate these challenges and improve RLHF approaches. One such approach is leveraging machine learning models to amplify the efficacy of the human feedback, for example, by learning to generalize from sparse human input or by synthesizing plausible feedback in situations where direct human input is not available.
@@ -93,12 +97,13 @@ RLHF 或偏好 fine-tuning 方法被无数人用于提升 AlpacaEval 等自动�
 在 RLHF 文献建立的过程中，大量模型以相关方法发布，声称借助 RLHF 提升了模型的"对齐"程度，但它们往往走得太远，发布了从误导性到毫无意义的各种评测得分。
 
 由对齐驱动的 RLHF 方法，如果做得正确，可以使模型更易于使用、更令人愉快。
-这通常伴随着 MT Bench 或 AlpacaEval 等评测工具上的明显提升。
+这通常伴随着 MT-Bench 或 AlpacaEval 等评测工具上的明显提升。
 
-2023 年秋，围绕 direct preference optimization（DPO）及其相对于 proximal policy optimization（PPO）和其他基于 RL 的偏好 fine-tuning 方法的角色，争论达到高峰——聊天评测与现实世界性能之间的平衡正是这场争论的核心（更多技术层面的权衡讨论，请参见第 8 章、Ivison 等人 2024 [@ivison2024unpacking]，或[这个讲座](https://youtu.be/YJMCSVLRUNs)）。
+2023 年秋，围绕 direct preference optimization（DPO）及其相对于 proximal policy optimization（PPO）和其他基于 RL 的偏好 fine-tuning 方法的角色，争论达到高峰——聊天评测与真实世界性能之间的平衡正是这场争论的核心（更多技术层面的权衡讨论，请参见第 8 章、Ivison 等人 2024 [@ivison2024unpacking]，或[这个讲座](https://youtu.be/YJMCSVLRUNs)）。
 问题在于，你也可以在反馈循环中或使用大量数据使用 DPO 和 PPO 等技术，以换取聊天性能，但这实际上会严重损害模型在数学或编程等其他任务上的表现。
 
-在 DPO 与 PPO 争论大量涌现的那段时期，有许多论文发布了令人印象深刻的 benchmark 数据，却没有能够维持持续公开使用的模型权重，因为这些模型在一般使用中并不稳健。
+在 DPO 与 PPO 争论大量涌现的那段时期，有许多论文发布了令人印象深刻的 benchmark 数据，却没有产生任何有意义的采用。
+即使这些论文发布了模型权重，它们也没有在公众使用中流行起来，因为这些模型在一般使用中并不稳健。
 在 2023 年秋或稍后应用 RLHF 时，根本不可能让一个对齐版的 70 亿参数模型在全面 benchmark 上真正击败 GPT-4（这类比较将会成立，即当时的小模型无法稳健地击败最好的大型前沿模型）。
 这似乎显而易见，但总有论文声称这类结果。
 @fig:DNO 来自一篇名为 Direct Nash Optimization（DNO）的论文，该论文声称其模型在 2024 年 4 月针对 7B 模型的 AlpacaEval 上达到了最先进水平 [@rosset2024direct]。
@@ -125,7 +130,7 @@ RLHF 或偏好 fine-tuning 方法被无数人用于提升 AlpacaEval 等自动�
 它是从另一个聊天模型 OpenChat [@wang2023openchat] fine-tuned 而来的（而 OpenChat 实际上是由另一个完全不同的组织训练的）。
 其训练完全专注于 k-wise reward model 训练和 PPO 优化，使其在 Arena 上提升了 10 个位次。
 模型的平均回复长度有所增加，但这种增加的方式足以真正帮助人类评判者。
-后来的例子，如 Olmo 3，实际上被记录为经历了大量的聊天训练，但作者更偏好具有更高数学、编程和推理得分的最终模型 checkpoint，而不是在基于 LLM-as-a-judge 的聊天 benchmark 上得分最高的潜在 checkpoint [@teamolmo2025olmo3]。
+后来的例子，如 Olmo 3，被记录为经历了大量的聊天训练，但作者更偏好具有更高数学、编程和推理得分的最终模型 checkpoint，而不是在基于 LLM-as-a-judge 的聊天 benchmark 上得分最高的潜在 checkpoint [@teamolmo2025olmo3]。
 
 一个自然的问题是：为什么 RLHF 会使模型回复变长？
 从根本上说，Arena 等评测告诉我们，当与简洁的回复进行比较时，模型的普通用户通常更喜欢更长、更完整的答案。

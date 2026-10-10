@@ -1,4 +1,4 @@
-<!-- source-commit: 02c6d49 -->
+<!-- source-commit: eecc49e -->
 <!--
   Copyright (c) 2025-2026 Nathan Lambert.
   Licensed under CC BY-NC-SA 4.0:
@@ -8,15 +8,17 @@
 ---
 prev-chapter: "训练概述"
 prev-url: "03-training-overview"
-page-title: Instruction Tuning
-search-title: "第 4 章：Instruction Tuning"
-next-chapter: "Reward Models"
+page-title: Instruction Fine-Tuning
+search-title: "第 4 章：Instruction Fine-Tuning"
+meta-description: "instruction tuning 如何将 base language model 变为可用的助手，并为后续的 RLHF 和 post-training 阶段奠定基础。"
+next-chapter: "Reward Modeling"
 next-url: "05-reward-models"
-lecture-video: "https://youtu.be/4gIwiSPmQkU"
-lecture-label: "第 2 讲：IFT、Reward Modeling、Rejection Sampling（第 4、5 及 9 章）"
+lectures:
+  - video: "https://www.youtube.com/watch?v=4gIwiSPmQkU&list=PLL1tdVxB1CpVpEtMHxwuR4uI4Lxjw00_y&index=3"
+    label: "第 2 讲：IFT、Reward Modeling、Rejection Sampling（第 4、5 及 9 章）"
 ---
 
-# Instruction Fine-tuning
+# Instruction Fine-Tuning
 
 早期的大型预训练 language model 以 next-token prediction 为训练目标，默认情况下并不具备显式的 instruction following 接口。
 在 GPT-3 发布前后 [@brown2020language]，prompting 和 in-context learning 成为将单一模型适配到多种任务的广泛方式（尽管针对特定任务的 fine-tuning 仍然常见），其做法是在上下文中展示示例，然后让模型完成类似任务。
@@ -131,7 +133,7 @@ Are you sure about that?<|im_end|>
 <|im_start|>assistant
 ```
 
-在开源生态中，将 chat template 应用于消息列表的标准方式使用 Jinja 片段——一种轻量的 Python 模板语言——存储在 tokenizer 配置中，作为 `apply_chat_template`。
+在开源生态中，将 chat template 应用于消息列表的标准方式使用 Jinja 片段，存储在 tokenizer 配置中，作为 `apply_chat_template`。
 
 上述 chat template 是 OpenAI 的 Chat Markup Language（ChatML）的衍生版本，ChatML 是早期标准化消息格式的尝试。
 如今，OpenAI 和其他模型提供商采用了分层系统，用户可以配置 system message，但还存在更高层级的指令，这些指令可能不会向用户披露 [@wallace2024instruction]。
@@ -173,7 +175,7 @@ ChatGPT 发布不久后，仅含 1 万条样本的人工 dataset（如 No Robots
 - 高质量数据是性能的关键。模型真正学习的是补全内容（在许多情况下，prompt token 不参与预测，因此模型不会学习预测 prompt）。
 - 约 100 万条 prompt 可用于训练出一个能够进行出色 RLHF 和 post-training 的模型。进一步扩展仍有帮助，但收益递减很快。
 - 最优质的 prompt 是那些与下游目标任务分布相似的 prompt。
-- 如果在 instruction tuning 之后还进行了多个训练阶段，模型可以从 instruction tuning 数据中的部分噪声中恢复。优化整体训练流程比优化每个单独阶段更为重要。
+- 如果在 instruction tuning 之后还进行了多个训练阶段，模型可以从 instruction tuning 数据中的部分噪声中恢复。精心设计整体优化流程比执着于每个单独阶段更为重要。
 
 ## 实现细节
 
@@ -184,4 +186,26 @@ ChatGPT 发布不久后，仅含 1 万条样本的人工 dataset（如 No Robots
 - **Prompt masking**：在 pretraining 时，batch 中的每个 token 都被自回归地预测，并对其应用 loss。对于 instruction tuning，prompt token 被 mask 掉，使模型不学习准确预测用户查询——只学习预测响应。其他 post-training 算法同样如此。
 - **多轮 masking**：对于多轮对话，有两种常见的 masking 选择。（1）*仅最后一轮*：只将最后一个 assistant 轮次中的 token 纳入 loss，所有更早的上下文（包括更早的 assistant 轮次）均被 mask。长对话仍可"展开"为多个训练样本：对于一段 $N$ 轮的对话，每个样本预测一个 assistant 回复，同时 mask 所有先前上下文并排除后续轮次。（2）*仅 mask user 轮次*：所有 user 轮次被 mask，但*每个* assistant 轮次都纳入 loss。如果需要更多（较短的）训练样本，在这种设置下仍可展开，但关键区别在于中间的 assistant 回复也被直接训练。
 - **与 pretraining 相同的 loss function**：Instruction tuning 使用与 pretraining language model 相同的自回归 loss function，但数据和 masking 方式有很大不同（仅在完整序列上训练，而 pretraining 文档可以跨 batch 切分），等等。
-- **Learning rate**：SFT 通常使用比 pretraining 小一到两个数量级的 learning rate，以更好地应对不同的优化动态（更小的 dataset、更小的 batch 以及强大的预训练初始化，都倾向于更保守的更新）。例如，OLMo 2 在 pretraining 时使用 $3 \times 10^{-4}$ 的峰值 learning rate，但 SFT 时使用 $1 \times 10^{-5}$ [@olmo20242]。OLMo 3 使用更高的 SFT learning rate $5\text{-}8 \times 10^{-5}$ [@teamolmo2025olmo3]，部分原因是其训练基础设施使用了 sequence packing——将多个样本打包进每个训练序列，增加了以有效 token 数衡量的 effective batch size。更大的 batch 产生方差更低的梯度估计，进而支持更高的 learning rate 而不使训练不稳定——这一关系称为线性缩放规则。Learning rate 通常在训练步数的一小部分上进行 warmup，随后线性衰减。实践中，团队通常在多个 learning rate 上进行扫描，并在留出的评估集上选择最佳 checkpoint [@teamolmo2025olmo3]。
+- **Learning rate**：SFT 通常使用比 pretraining 小一到两个数量级的 learning rate，以更好地应对不同的优化动态（更小的 dataset、更小的 batch 以及强大的预训练初始化，都倾向于更保守的更新）。例如，OLMo 2 在 pretraining 时使用 $3 \times 10^{-4}$ 的峰值 learning rate，但 SFT 时使用 $1 \times 10^{-5}$ [@olmo20242]。Olmo 3 使用更高的 SFT learning rate $5\text{-}8 \times 10^{-5}$ [@teamolmo2025olmo3]，部分原因是其训练基础设施使用了 sequence packing——将多个样本打包进每个训练序列，增加了以有效 token 数衡量的 effective batch size。更大的 batch 产生方差更低的梯度估计，进而支持更高的 learning rate 而不使训练不稳定——这一关系称为线性缩放规则。Learning rate 通常在训练步数的一小部分上进行 warmup，随后线性衰减。实践中，团队通常在多个 learning rate 上进行扫描，并在留出的评估集上选择最佳 checkpoint [@teamolmo2025olmo3]。
+
+## 建议实验
+
+配套代码仓库在 `code/instruction_tuning/` 中包含一个小型 SFT 训练脚本。
+它旨在作为一个学习练习，让从 base model 到 assistant 的转变变得具体可感。
+
+1. **运行标准 SFT 示例，观察从 base 到 assistant 的转变。**
+   运行：
+
+   ```bash
+   cd code/
+   uv run python -m instruction_tuning.train --config instruction_tuning/configs/sft_olmo2_1b.yaml
+   ```
+
+   这会在 `HuggingFaceH4/no_robots` 上训练 `allenai/OLMo-2-0425-1B`（base），并每 50 个 optimizer step 针对一组固定的 prompt 打印生成结果。
+   在 step 0 时，base model 会胡言乱语、重复 prompt，并输出格式错误的角色标记；经过几百步之后，同样的 prompt 会产生简洁的回答，并在 `<|endoftext|>` 处终止。
+   这是对 instruction tuning 的健全性检查——loss function 与 pretraining 相同，但应用于 chat template，并 mask 掉 prompt token。
+
+2. **扫描 learning rate。**
+   复制 `sft_olmo2_1b.yaml`，在保持其他设置不变的情况下尝试 `lr` 取 `1e-6`、`5e-6` 和 `5e-5`。
+   观察在哪个 learning rate 下模型首次能够回答并干净地停止，又在哪个 learning rate 下会过拟合并开始产生套着模板外壳的低质量内容。
+   这正是上文"比 pretraining 小一到两个数量级"这一指导原则的实践版本。

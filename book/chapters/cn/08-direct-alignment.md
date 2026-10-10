@@ -1,4 +1,4 @@
-<!-- source-commit: 02c6d49 -->
+<!-- source-commit: eecc49e -->
 <!--
   Copyright (c) 2025-2026 Nathan Lambert.
   Licensed under CC BY-NC-SA 4.0:
@@ -6,15 +6,21 @@
   Full license: https://github.com/natolambert/rlhf-book/blob/main/LICENSE-CHAPTERS
 -->
 ---
-prev-chapter: "推理"
+prev-chapter: "推理与推理时扩展"
 prev-url: "07-reasoning"
-page-title: 直接对齐
-search-title: "第8章：直接对齐"
+page-title: 直接对齐算法
+search-title: "第8章：直接对齐算法"
+meta-description: "以 DPO 为代表的直接对齐算法：无需显式 reward model 或 RL 循环即可优化偏好目标。"
 next-chapter: "拒绝采样"
 next-url: "09-rejection-sampling"
+lectures:
+  - video: "https://www.youtube.com/watch?v=6g6b4gvO-y0&list=PLL1tdVxB1CpVpEtMHxwuR4uI4Lxjw00_y&index=8"
+    label: "第六讲：Direct Preference Optimization"
+  - video: "https://www.youtube.com/watch?v=rhA7pLVt4E0&list=PLL1tdVxB1CpVpEtMHxwuR4uI4Lxjw00_y&index=16"
+    label: "对话二：DPO 实践"
 ---
 
-# 直接对齐算法（DAAs）
+# 直接对齐算法
 
 直接对齐算法（DAAs）允许在无需训练中间 reward model 或使用 RL 优化器的情况下，对模型进行更新以求解相同的 RLHF 目标。
 DAAs 解决的是我们一直在研究的同一种 preference learning 问题（使用完全相同的数据！），目的是使语言模型更加对齐、更加智能、更易于使用。
@@ -29,11 +35,11 @@ $$ \max_{\pi} \mathbb{E}_{x \sim \mathcal{D}}\mathbb{E}_{y \sim \pi(y|x)} \left[
 自2023年5月发布以来，在社区历经短暂摸索找到配合 DPO 使用的正确数据和超参数（尤其是出人意料地低的学习率）之后，许多主流模型先后采用了 DPO 或其变体——从2023年10月率先起步的 Zephyr-$\beta$ [@tunstall2023zephyr]，到 Llama 3 Instruct [@dubey2024llama]、Tülu 2 [@ivison2023camels] 与 Tülu 3 [@lambert2024t]、Nemotron 4 340B [@adler2024nemotron]，以及其他许多模型。
 从技术角度来看，Sequence Likelihood Calibration（SLiC-HF）才是最早发布的现代 direct alignment 算法 [@zhao2023slic]，但由于多重因素的共同作用，它并未得到广泛采用（厘清研究方法被采纳或被忽略的缘由，向来是一项棘手的任务）。
 
-DPO 和 DAAs 最具影响力的贡献在于降低了语言模型 post-training 实验的门槛——所需计算量更少，从零实现更为简便，在玩具示例和生产环境中都更容易跑通。
+DPO 和 DAAs 最具影响力的贡献在于降低了语言模型 post-training 实验的入门门槛——所需计算量更少，从零实现更为简便，在玩具示例和生产环境中都更容易跑通。
 
 *在本章中，我们用 $x$ 表示提示（prompt），用 $y$ 表示补全（completion）。这一符号约定在语言模型文献中十分常见，其中的方法作用于完整的 prompt-completion 对，而非单个 token。*
 
-## Direct Preference Optimization（DPO）
+## Direct Preference Optimization
 
 下面我们将解释 DPO 工作原理的直觉理解，并完整重新推导其核心方程。
 
@@ -63,7 +69,7 @@ $$r(x, y) = \beta  \log \frac{\pi_r(y \mid x)}{\pi_{\text{ref}}(y \mid x)}$$ {#e
 
 利用 @eq:dpo_reward 中的 reward，我们可以写出 loss 的梯度，以进一步理解其中发生的事情：
 
-$$\nabla_{\theta}\mathcal{L}_{\text{DPO}}(\pi_{\theta}; \pi_{\text{ref}}) = -\beta \mathbb{E}_{(x, y_c, y_r)\sim \mathcal{D}}\Big[ w \cdot \left(\nabla_{\theta}\log \pi(y_c \mid x) - \nabla_{\theta}\log \pi(y_r \mid x)\right) \Big]$$ {#eq:dpo_gradient}
+$$\nabla_{\theta}\mathcal{L}_{\text{DPO}}(\pi_{\theta}; \pi_{\text{ref}}) = -\beta \mathbb{E}_{(x, y_c, y_r)\sim \mathcal{D}}\left[ w \cdot \left(\nabla_{\theta}\log \pi_{\theta}(y_c \mid x) - \nabla_{\theta}\log \pi_{\theta}(y_r \mid x)\right) \right]$$ {#eq:dpo_gradient}
 
 其中 $w = \sigma\!\left(r_{\theta}(x, y_r) - r_{\theta}(x, y_c)\right)$。
 
@@ -74,7 +80,7 @@ $$\nabla_{\theta}\mathcal{L}_{\text{DPO}}(\pi_{\theta}; \pi_{\text{ref}}) = -\be
 - 这些项由 $\beta$ 加权，$\beta$ 控制着更新在正确排序补全与 KL divergence 之间的平衡。
 
 核心直觉在于：DPO 正在拟合一个隐式 reward model，其对应的最优 policy 可以以闭合形式提取（@eq:dpo_opt_policy，借助梯度下降和我们的机器学习工具）。
-由于 DPO loss 是直接可微的，因此可以直接计算精确梯度，而无需通过训练 reward model 并采样补全来打分这一间接途径。
+由于 DPO loss 是直接可微的，因此可以直接计算精确梯度，而无需通过训练 reward model 并采样补全来打分去估计它。
 常被误解的是，DPO 在其核心处是在学习一个 reward model，这也是该论文副标题的含义——*你的语言模型秘密地是一个 Reward Model*。
 人们很容易将其与 DPO 目标直接训练 policy 相混淆，因此研究下方的推导有助于形成完整的理解。
 
@@ -94,7 +100,7 @@ DPO 推导分为两个主要部分。
 首先，作者展示了最优求解本书中所用 RLHF 目标的 policy 形式。
 其次，他们展示了如何从成对 preference data（即 Bradley-Terry 模型）中得到该解。
 
-#### 1. 推导最优 RLHF 解
+#### 推导最优 RLHF 解
 
 首先，让我们再次考虑 RLHF 优化目标，此处表明我们希望最大化以下量：
 
@@ -108,11 +114,11 @@ $$\max_{\pi} \mathbb{E}_{x \sim \mathcal{D}}\mathbb{E}_{y \sim \pi(y|x)}\left[r(
 
 接下来，将负号从括号内的差式中提出。为此，将其拆分为两项：
 
-$$ = \max_{\pi}\left(\mathbb{E}_{x \sim \mathcal{D}}\mathbb{E}_{y \sim \pi(y|x)}[r(x,y)] - \beta\,\mathbb{E}_{x \sim \mathcal{D}}\mathbb{E}_{y \sim \pi(y|x)}\left[\log\frac{\pi(y|x)}{\pi_{\text{ref}}(y|x)}\right]\right) $$ {#eq:dpo_deriv_2}
+$$ = \max_{\pi}\left(\mathbb{E}_{x \sim \mathcal{D}}\mathbb{E}_{y \sim \pi(y|x)}\left[r(x,y)\right] - \beta\,\mathbb{E}_{x \sim \mathcal{D}}\mathbb{E}_{y \sim \pi(y|x)}\left[\log\frac{\pi(y|x)}{\pi_{\text{ref}}(y|x)}\right]\right) $$ {#eq:dpo_deriv_2}
 
 然后，乘以 $-1$ 将最大化转化为最小化：
 
-$$ = \min_{\pi}\left(-\mathbb{E}_{x \sim \mathcal{D}}\mathbb{E}_{y \sim \pi(y|x)}[r(x,y)] + \beta\,\mathbb{E}_{x \sim \mathcal{D}}\mathbb{E}_{y \sim \pi(y|x)}\left[\log\frac{\pi(y|x)}{\pi_{\mathrm{ref}}(y|x)}\right]\right) $$ {#eq:dpo_deriv_3}
+$$ = \min_{\pi}\left(-\mathbb{E}_{x \sim \mathcal{D}}\mathbb{E}_{y \sim \pi(y|x)}\left[r(x,y)\right] + \beta\,\mathbb{E}_{x \sim \mathcal{D}}\mathbb{E}_{y \sim \pi(y|x)}\left[\log\frac{\pi(y|x)}{\pi_{\mathrm{ref}}(y|x)}\right]\right) $$ {#eq:dpo_deriv_3}
 
 除以 $\beta$ 并重新合并：
 
@@ -152,12 +158,12 @@ $$ \min_{\pi}\mathbb{E}_{x\sim\mathcal{D}} \left[ \mathbb{E}_{y\sim\pi(y|x)}\lef
 
 $$ \min_{\pi}\mathbb{E}_{x\sim\mathcal{D}}\left[\mathcal{D}_{\text{KL}} \left(\pi(y|x) \middle\| \frac{1}{Z(x)}\pi_{\text{ref}}(y|x)\exp\left(\frac{1}{\beta}r(x,y)\right) \right) - \log Z(x)\right] $$ {#eq:dpo_deriv_11}
 
-由于 $\log Z(x)$ 项与最终结果无关，可以忽略。这样就只剩下我们正在学习的 policy 与一个涉及配分函数、$\beta$、reward 以及 reference policy 的形式之间的 KL divergence。Gibbs 不等式告诉我们，该 KL divergence 在距离为 0 时取得最小值，而这仅在两个量相等时成立！因此，我们得到最优 policy：
+由于 $\log Z(x)$ 项不依赖于 $\pi$（即我们正在优化的 policy），可以忽略。这样就只剩下我们正在学习的 policy 与一个涉及配分函数、$\beta$、reward 以及 reference policy 的形式之间的 KL divergence。Gibbs 不等式告诉我们，该 KL divergence 在距离为 0 时取得最小值，而这仅在两个量相等时成立！因此，我们得到最优 policy：
 
 $$ \pi^*(y|x) = \pi(y|x) = \frac{1}{Z(x)}\pi_{\text{ref}}(y|x)\exp\left(\frac{1}{\beta}r(x,y)\right) $$ {#eq:dpo_opt_policy}
 
 
-#### 2. 推导 Bradley Terry 模型的 DPO 目标函数
+#### 推导 BT 模型的 DPO 目标函数
 
 首先，回顾第 5 章关于 Reward Modeling 以及第 11 章关于 Preference Data 的内容，Bradley-Terry 人类偏好模型表述如下：
 
@@ -184,7 +190,7 @@ $$r^*(x, y) = \beta \log \frac{\pi^*(y \mid x)}{\pi_{\text{ref}}(y \mid x)} + \b
 $$p^*(y_1 \succ y_2 \mid x) = \frac{\exp\left(\beta \log \frac{\pi^*(y_1 \mid x)}{\pi_{\text{ref}}(y_1 \mid x)} + \beta \log Z(x)\right)}
 {\exp\left(\beta \log \frac{\pi^*(y_1 \mid x)}{\pi_{\text{ref}}(y_1 \mid x)} + \beta \log Z(x)\right) + \exp\left(\beta \log \frac{\pi^*(y_2 \mid x)}{\pi_{\text{ref}}(y_2 \mid x)} + \beta \log Z(x)\right)} $$ {#eq:dpo_loss_deriv0}
 
-通过将指数表达式从 $e^{a+b}$ 分解为 $e^a e^b$，再消去 $e^{\log(Z(x))}$ 项，化简得到：
+通过将指数表达式从 $e^{a+b}$ 分解为 $e^a e^b$，再消去 $e^{\beta \log Z(x)}$ 项，化简得到：
 
 $$p^*(y_1 \succ y_2 \mid x) = \frac{\exp\left(\beta \log \frac{\pi^*(y_1 \mid x)}{\pi_{\text{ref}}(y_1 \mid x)}\right)}
 {\exp\left(\beta \log \frac{\pi^*(y_1 \mid x)}{\pi_{\text{ref}}(y_1 \mid x)}\right) + \exp\left(\beta \log \frac{\pi^*(y_2 \mid x)}{\pi_{\text{ref}}(y_2 \mid x)}\right)} $$ {#eq:dpo_loss_deriv1}
@@ -197,7 +203,7 @@ $$p^*(y_1 \succ y_2 \mid x) = \frac{1}{1 + \exp\left(\beta \log \frac{\pi^*(y_2 
 
 $$p^*(y_1 \succ y_2 \mid x) = \sigma\left(\beta \log \frac{\pi^*(y_1 \mid x)}{\pi_{\text{ref}}(y_1 \mid x)} - \beta \log \frac{\pi^*(y_2 \mid x)}{\pi_{\text{ref}}(y_2 \mid x)}\right) $$ {#eq:dpo_loss_deriv3}
 
-这是在最优 policy $\pi^*$ 下，Bradley-Terry 模型给出的 preference data 的似然概率。回顾第 5 章关于 Reward Modeling 的内容，我们已推导出 Bradley-Terry 目标函数为最大化似然，即等价地最小化负对数似然，由此得到损失函数：
+这是在最优 policy $\pi^*$ 下，Bradley-Terry 模型给出的 preference data 的似然概率。回顾第 5 章关于 Reward Modeling 的内容，我们推导出 Bradley-Terry 目标函数为最大化似然，即等价地最小化负对数似然，由此得到损失函数：
 $$
 \begin{aligned}
 \mathcal{L}_{\text{DPO}}(\pi_{\theta}; \pi_{\text{ref}}) &= -\mathbb{E}_{(x,y_c,y_r)\sim\mathcal{D}}\left[ \log p(y_c \succ y_r \mid x)  \right] \\
@@ -207,7 +213,7 @@ $${#eq:dpo_loss_deriv4}
 
 这就是 DPO 的损失函数，其形式如 @eq:dpo_core 所示。DPO 论文还额外推导了 Plackett-Luce 模型下的目标函数，但该形式在实践中较少使用 [@rafailov2024direct]。
 
-#### 3. 推导 Bradley Terry DPO 梯度
+#### 推导 BT DPO 梯度
 
 我们在 @eq:dpo_gradient 中使用了 DPO 梯度来解释模型学习的直觉。要推导该梯度，需要对 @eq:dpo_loss_deriv4 关于模型参数求梯度。
 
@@ -221,7 +227,7 @@ $$\nabla_{\theta}\mathcal{L}_{\text{DPO}}(\pi_{\theta};\pi_{\text{ref}}) = -\mat
 
 展开并利用上述 sigmoid 和对数的表达式，得到前面引入的梯度：
 
-$$ -\mathbb{E}_{(x,y_c,y_r)\sim\mathcal{D}}\left[\beta\sigma\left(\beta\log\frac{\pi_{\theta}(y_r|x)}{\pi_{\text{ref}}(y_r|x)} - \beta\log\frac{\pi_{\theta}(y_c|x)}{\pi_{\text{ref}}(y_c|x)}\right)\left[\nabla_{\theta}\log\pi(y_c|x)-\nabla_{\theta}\log\pi(y_r|x)\right]\right] $$ {#eq:dpo_grad_3}
+$$ -\mathbb{E}_{(x,y_c,y_r)\sim\mathcal{D}}\left[\beta\sigma\left(\beta\log\frac{\pi_{\theta}(y_r|x)}{\pi_{\text{ref}}(y_r|x)} - \beta\log\frac{\pi_{\theta}(y_c|x)}{\pi_{\text{ref}}(y_c|x)}\right)\left[\nabla_{\theta}\log\pi_{\theta}(y_c|x)-\nabla_{\theta}\log\pi_{\theta}(y_r|x)\right]\right] $$ {#eq:dpo_grad_3}
 
 ## 数值问题、局限性与替代方法
 
@@ -234,7 +240,7 @@ DPO 算法的许多变体已被提出，以解决 DPO 的不足。例如，由�
 DPO 的部分变体试图通过对 loss 进行小幅改动来提升学习信号，或通过减少内存占用来提高应用效率。
 
 - **Odds Ratio Policy Optimization（ORPO）** 直接更新 policy model，向 chosen 响应靠拢，类似于指令 fine-tuning 的 loss，同时对 rejected 响应施加小额惩罚 [@hong2024reference]。这种 loss 函数的变化无需 reference model，从而简化了训练流程。理解 ORPO 的最佳视角是将其视为受 DPO 启发的方法，而非 DPO 的直接衍生。
-- **Simple Preference Optimization SimPO** 对 DPO 优化做了一处细微改动：将 log 概率求和改为取平均（SimPO），或添加长度归一化，以提升性能 [@meng2025simpo]。
+- **Simple Preference Optimization（SimPO）** 对 DPO 优化做了一处细微改动：将 log 概率求和改为取平均，或添加长度归一化，以提升性能 [@meng2025simpo]。
 
 ![DPO 中 preference displacement 示意图。](images/dpo_displacement.png){#fig:dpo_issue .center}
 
@@ -277,7 +283,7 @@ rejected_rewards = beta * (policy_rejected_logps - reference_rejected_logps).det
 总体而言，DAA 在大多数方面更为简单，提升了使用体验，但也带来了一套不同的注意事项。
 
 1. **KL divergence 是静态的**：在 DPO 及其他算法中，KL divergence 由 $\beta$ 参数显式设定，用于平衡与优化目标之间的距离惩罚。这是因为 DPO 在给定数据的情况下直接朝 RLHF 目标的*最优解*迈进——即精确地步向由 $\beta$ 项所设定的解。而基于 RL 的优化器则根据当前 batch 和近期数据逐步更新。
-2. **缓存 log 概率**：DPO 的简单实现方式会同时对 policy model 和 reference model 进行前向传播，以便计算 loss。但这会使内存占用翻倍，增加 GPU 使用量。为避免此问题，可先在整个训练数据集上计算 reference model 的 log 概率并缓存，然后在每个 batch 计算 loss 和更新参数时直接引用，从而将峰值内存减少约 50%。
+2. **缓存 log 概率**：DPO 的简单实现方式会同时对 policy model 和 reference model 进行前向传播，以便计算 loss。但这会使内存占用翻倍，增加 GPU 使用量。为避免此问题，可先在整个训练数据集上计算 reference model 的 log 概率并缓存，然后在每个 batch 计算 loss 和更新参数时复用这些缓存的 reference log 概率，从而将峰值内存减少约 50%。
 
 ## 使用合成 Preference Data 的 DAA
 
@@ -311,3 +317,44 @@ rejected_rewards = beta * (policy_rejected_logps - reference_rejected_logps).det
 
 尽管存在这一性能差距，DAA 因其简洁性仍在主流模型中得到广泛应用。
 DAA 提供了一个可控的环境，使训练数据和其他配置的迭代能够快速进行，而且鉴于数据往往比算法更重要，使用 DPO 也完全可行。
+
+## 建议实验
+
+配套代码 `code/direct_alignment/` 在偏好数据上训练 DPO 及若干相关 loss。
+这是开始尝试 preference tuning 最容易上手的地方，因为其设置是 offline 的：无需 reward model 服务器或 rollout 循环。
+
+1. **在 UltraFeedback 上训练一次小规模 DPO。**
+
+   ```bash
+   cd code/
+   uv run python -m direct_alignment.train --loss dpo --max_samples 1000
+   ```
+
+   关注 `loss`、`accuracy`、`margins`、`chosen_rewards` 和 `rejected_rewards`。
+   主要的合理性检查是：隐式 reward 的边际应朝期望方向变化，同时模型生成的样本不应出现崩溃。
+
+2. **比较 DPO、IPO 和长度归一化的 DPO。**
+
+   ```bash
+   cd code/
+   uv run python -m direct_alignment.train --config direct_alignment/configs/dpo.yaml
+   uv run python -m direct_alignment.train --config direct_alignment/configs/ipo.yaml
+   uv run python -m direct_alignment.train --config direct_alignment/configs/dpo_norm.yaml
+   ```
+
+   比较边际的量级以及对学习率的敏感程度。
+   IPO 的 loss 与 DPO 不在同一数值量级上，因此应通过 `accuracy` 和边际的变化来解读，而不是只看原始 loss。
+
+3. **谨慎尝试无 reference 的变体。**
+   通过配置运行 SimPO 或 ORPO，然后检查训练期间记录的生成样本。
+   这些 loss 对 log 概率的尺度和学习率更为敏感，因此是很好的调试练习。
+
+   ```bash
+   cd code/
+   uv run python -m direct_alignment.train --config direct_alignment/configs/simpo.yaml
+   uv run python -m direct_alignment.train --config direct_alignment/configs/orpo.yaml
+   ```
+
+4. **先改数据，再改 loss。**
+   保持 loss 不变，改变 `--max_samples`、`--max_length` 或 preference 数据集。
+   如果结果的变化幅度超过在各类 DPO 类目标之间切换所带来的变化，这就从经验上印证了 preference tuning 的一个核心主题：数据通常比细微的算法差异更重要。

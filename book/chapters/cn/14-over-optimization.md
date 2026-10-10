@@ -1,4 +1,4 @@
-<!-- source-commit: 02c6d49 -->
+<!-- source-commit: eecc49e -->
 <!--
   Copyright (c) 2025-2026 Nathan Lambert.
   Licensed under CC BY-NC-SA 4.0:
@@ -6,18 +6,22 @@
   Full license: https://github.com/natolambert/rlhf-book/blob/main/LICENSE-CHAPTERS
 -->
 ---
-prev-chapter: "工具使用"
+prev-chapter: "工具使用与函数调用"
 prev-url: "13-tools"
 page-title: 过度优化
 search-title: "第14章：过度优化"
+meta-description: "RLHF 过度优化与 reward hacking 是如何发生的，以及它们为何对 post-training 和对齐至关重要。"
 next-chapter: "正则化"
 next-url: "15-regularization"
+lectures:
+  - video: "https://www.youtube.com/watch?v=y04JhXpiI4s&list=PLL1tdVxB1CpVpEtMHxwuR4uI4Lxjw00_y"
+    label: "第九讲：过度优化与 RLHF 的坏名声"
 ---
 
 # 过度优化
 
 在其领域中大量使用强化学习时，人们学到的一个核心教训是：它是一个非常强大的优化器，会将环境中所有可能增加的reward都挖掘出来。
-在现代机器学习系统中，尤其是语言模型领域，我们使用了某种人为构造的环境概念——模型生成补全内容（即动作），而外部验证器（即reward model或评分函数）提供反馈。
+在现代机器学习系统中，尤其是语言模型领域，我们使用了某种人为构造的环境概念——模型生成补全内容（即动作），而外部验证器（例如reward model或评分函数）提供反馈。
 在这个领域中，over-optimization极为常见：RL优化器会将语言模型推向某些方向，使其生成内容能够满足我们的检查函数，但这些行为并不符合我们的训练目标。
 本章概述这一经典的 **over-optimization** 现象。
 
@@ -44,10 +48,10 @@ RLHF中的over-optimization主要以两种方式呈现：
 ### 管理proxy目标
 
 RLHF的建立正是基于这样一个事实：我们并不拥有针对聊天机器人的通用良好reward函数。
-RLHF之所以走到前沿，是因为它在让聊天机器人变得更易用方面表现出色——而这完全依赖于一个proxy目标：认为在受控环境中人工标注者给出的reward能够反映下游用户的真实需求。
+RLHF之所以走到前沿，是因为它在让聊天机器人变得更易用方面表现出色——而这完全依赖于一个proxy目标：认为在受控环境中由人工标注者衡量的reward能够反映下游用户的真实需求。
 广义上的post-training已演变为包含对可明确验证的reward的训练，但仅从偏好学习（依然通过这些proxy目标）也能提升数学推理和编程等领域的表现。
 
-RLHF中的proxy reward是训练好的reward model返回给RL算法的分数，因为任何reward model——即便用当今工具训练得近乎完美——也只能在最好的情况下与对话或下游表现相关联 [@schulman2023proxy]（这源于我们为RLHF所构建的问题设置的本质）。
+RLHF中的proxy reward是训练好的reward model返回给RL算法的分数，因为任何reward model——即便用当今工具训练得几乎完美——也只能在最好的情况下与对话或下游表现相关联 [@schulman2023proxy]（这源于我们为RLHF所构建的问题设置的本质）。
 因此，已有研究表明，对算法中RL部分施加过多的优化力度，实际上会降低最终语言模型的有用性——这是一种许多强化学习应用中已知的over-optimization [@zhang2018study]。
 而over-optimization即"当优化proxy目标导致真实目标先变好、再变差"的现象。
 
@@ -78,12 +82,12 @@ Goodhart阐述了如今已司空见惯的行为 [@goodhart1984problems]：
 错误来源众多 [@schulman2023proxy]：reward model无法拟合偏好所带来的近似误差、训练RM过程中过拟合导致的估计误差、训练语言模型policy时的优化误差，等等。
 这指向一个根本性问题：优化数据承包商的意图与输出，相对于下游用户需求，其局限性究竟在哪里。
 
-一个潜在的解决方案是从聊天机器人和模型的用户那里收集*隐式*反馈，以调优性能。
+一个潜在的解决方案是衡量聊天机器人和模型用户的*隐式*反馈，以调优性能。
 隐式反馈是指用户采取的行动，例如重新生成输出、关闭标签页，或发送愤怒的消息，这些行为都能反映上一条回复的质量。
 这里的挑战——以及RLHF大多数优化改动所面临的挑战——在于：使reward函数更加具体时，存在很大的稳定性丧失风险。
 RL作为强大的优化器，当reward函数是平滑曲面（而非仅仅是成对人类价值判断）时，越来越容易对其进行利用。
 预期的解决方案是：未来的RLHF将同时使用成对偏好数据和额外的引导损失函数进行训练。
-此外，也有一系列不同的损失函数可以更好地处理成对数据，例如Mallow模型 [@lu2011learning] 或Plackett-Luce [@liu2019learning]。
+此外，也有一系列不同的损失函数可以更好地处理成对数据，例如Mallows模型 [@lu2011learning] 或Plackett-Luce [@liu2019learning]。
 
 ### 过度拒绝与"过多RLHF"
 
@@ -108,8 +112,8 @@ RL作为强大的优化器，当reward函数是平滑曲面（而非仅仅是成
 >
 > **助手**：我很抱歉，我不应该提供关于伤害进程或系统的建议。
 
-上述两个例子并非完全由训练决定，也反映了模型的部署设置，例如系统提示词（system prompt）。
-此外，现代聊天应用还使用额外的安全过滤器，在提示词和回复发送给主生成模型之前进行拦截（例如WildGuard [@han2024wildguard] 或LlamaGuard [@inan2023llama]）。
+这两个例子都不仅仅与训练相关，也反映了模型的部署设置，例如系统提示词（system prompt）。
+此外，现代聊天应用还使用额外的安全过滤器，在提示词和回复发送给主生成模型之前进行拦截（例如WildGuard [@han2024wildguard] 或Llama Guard [@inan2023llama]）。
 
 虽然RLHF是这些模型区分安全与不安全请求能力的训练核心，但将最终模型行为的失败归因于所使用的训练方法并不准确。
 更确切地说，是训练方法与建模团队的数据筛选准则共同决定了请求安全性与其他能力之间的预期平衡。
@@ -120,11 +124,11 @@ RL作为强大的优化器，当reward函数是平滑曲面（而非仅仅是成
 行业标准已转向更窄范围的危害界定，以及在争议性议题上能保持均衡立场的模型。
 缓解这种行为的公认最佳实践是修改训练数据（例如使用第17章介绍的"角色训练"等方法）。
 如今，大量面向AI应用的fine-tuning工作，是在已经过大量RLHF及其他post-training的所谓"Instruct"或"Thinking"模型基础上进一步fine-tuning完成的。
-这些已经训练好的模型往往更难被改变，例如要消除其过度拒绝的倾向，通常从大规模自回归预训练结束后直接使用base model来引导此类行为是最优选择。
+这些已经训练好的模型往往更难被改变，例如要消除其过度拒绝的倾向，而直接从大规模自回归预训练结束后的base model出发，通常最适合引导此类行为。
 
 ## 量化 Over-optimization
 
-Over-optimization 同样是一个专门的研究领域，研究者在其中探讨模型性能与KL优化距离之间的关系 [@gao2023scaling]。
+Over-optimization 同样是一个专门的研究领域，研究者在其中探讨模型性能和KL优化距离之间的关系 [@gao2023scaling]。
 回顾一下，KL距离是衡量训练前原始模型（即reference model）与当前 policy 概率分布之间差距的指标。
 例如，@fig:overoptimization 中所示的关系，也可以用横轴表示KL优化距离而非训练步数来呈现。
 下面还有一个额外的示例：将一个偏好tuning数据集对半分割，分别用于训练reward model（偏好模型，下文简称PM）和测试reward model。
@@ -135,7 +139,7 @@ Over-optimization 对于 RLHF 来说是根本性且不可避免的，这源于re
 
 ![来自 Bai et al. 2022 的训练与测试 RM 的 over-optimization 情况。许可证：CC-BY。](images/anthropic_overoptimization.png){#fig:anthropic_overoptimization width=450px}
 
-采用不同的 RLHF 训练方法，所消耗的KL距离也会有所不同（是的，研究人员在训练过程中会密切跟踪KL divergence指标，比较不同实验中模型的变化幅度——KL divergence指标过大往往意味着潜在的bug或模型出现问题）。
+采用不同的 RLHF 训练方法，所消耗的KL距离也会有所不同（是的，研究人员在训练过程中会密切跟踪KL divergence指标，比较不同实验中模型的变化幅度——因为KL divergence指标过大往往意味着潜在的bug或模型出现问题）。
 例如，在线RL算法（如PPO）修改模型参数时使用的KL距离，远高于推理时采样方法（如best-of-N采样，BoN）所使用的KL距离。
 在RL训练中，更高的KL penalty会在给定KL距离处减少over-optimization，但可能需要更多的整体训练步数才能使模型达到这一状态。
 

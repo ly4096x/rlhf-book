@@ -1,4 +1,4 @@
-<!-- source-commit: 02c6d49 -->
+<!-- source-commit: eecc49e -->
 <!--
   Copyright (c) 2025-2026 Nathan Lambert.
   Licensed under CC BY-NC-SA 4.0:
@@ -6,29 +6,40 @@
   Full license: https://github.com/natolambert/rlhf-book/blob/main/LICENSE-CHAPTERS
 -->
 ---
-prev-chapter: "合成数据与CAI"
+prev-chapter: "合成数据与蒸馏"
 prev-url: "12-synthetic-data"
-page-title: Tool Use
-search-title: "第13章：Tool Use"
+page-title: Tool Use与Function Calling
+search-title: "第13章：Tool Use与Function Calling"
+meta-description: "将tool use与function calling作为post-training目标，用于构建能力更强的语言模型产品和agent。"
 next-chapter: "过度优化"
 next-url: "14-over-optimization"
+lectures:
+  - video: "https://www.youtube.com/watch?v=GMry2DzC304&list=PLL1tdVxB1CpVpEtMHxwuR4uI4Lxjw00_y&index=17"
+    label: "第十一讲：Tool Use、Function Calling与通往Agent之路"
 ---
 
 # Tool Use与Function Calling
 
 语言模型使用工具是扩展其能力的一种自然方式，尤其适用于外部工具包含所需信息的高精度任务，或需要与复杂网络系统交互的agent。
-Tool use是语言模型需要通过训练才能掌握的技能，RLHF以及本书中介绍的所有其他方法都可以对其进行精炼。
+Tool use是语言模型需要通过训练才能掌握的技能，而RLHF以及本书中介绍的所有其他方法都可以对其进行精炼。
 考虑如下用户问题：
 
 > **用户**：今天的总统是谁？
 
 没有工具的语言模型很难回答这个问题，因为预训练数据存在知识截止日期，但通过一次搜索查询即可轻松获取这一信息。
+再考虑另一个例子：
+
+> **用户**：把我下载文件夹里所有的arXiv论文移动到~/research/目录下，并以能体现论文日期的名称重命名。
+
+这是仅凭模型权重根本无法尝试的任务——tool use使语言模型能够处理范围广泛得多的任务。
 
 在深入探讨之前，有必要区分几个常被互换使用的相关术语：
 
 - **Tool use**：模型输出一个结构化请求（工具名称和参数）；编排器执行该工具；结果被追加到上下文中；模型继续生成。
 - **Function calling**：tool use的一种形式，其中参数必须符合一组已声明函数的schema（通常为JSON Schema），从而实现可靠的解析和验证。
 - **代码执行**：tool use的一种特殊情况，其中"工具"是代码解释器（例如Python）；结果以工具输出的形式返回。
+
+## Tool-Use概述
 
 AI模型通过输出特殊token来触发某个端点，从而使用任何外部工具。
 这些工具可以是高度专用的工具（如返回特定地点天气的函数），也可以是代码解释器或搜索引擎，它们是构建复杂行为的基础模块。
@@ -70,8 +81,8 @@ print(str(compute_pi())[:52])
 此后不久，又有人探索了将语言模型与程序[@gao2023pal]或工具[@parisi2022talm]相结合的方案。
 
 随着该领域的成熟，这些模型除了底层语言建模的大幅改进之外，还获得了更复杂的能力。
-例如，ToolFormer能够使用"计算器、问答系统、两种不同的搜索引擎、翻译系统和日历"[@schick2023toolformerlanguagemodelsteach]。
-此后不久，Gorilla经过训练可以使用1645个API（来自PyTorch Hub、TensorFlow Hub v2和HuggingFace），其评估框架APIBench成为广受欢迎的Berkeley Function Calling Leaderboard的基础[@patil2023gorilla]。
+例如，Toolformer能够使用"计算器、问答系统、两种不同的搜索引擎、翻译系统和日历"[@schick2023toolformerlanguagemodelsteach]。
+此后不久，Gorilla经过训练可以使用1645个API（来自PyTorch Hub、TensorFlow Hub v2和Hugging Face），其评估框架APIBench成为广受欢迎的Berkeley Function Calling Leaderboard的基础[@patil2023gorilla]。
 自这些早期模型以来，调用动作的多样性已大幅增长。
 
 Tool use模型现在与常规语言模型交互深度融合。
@@ -84,8 +95,7 @@ ToolLLM及其ToolBench dataset提供了一个大规模框架，用于在16,000�
 
 ## 在生成过程中交织Tool Calls
 
-Function calling agent所呈现的数据与其他post-training阶段非常相似。
-不同之处在于系统提示中的内容，该内容指示模型可使用哪些工具。
+Function calling的训练数据与其他post-training数据非常相似，唯一的补充是系统提示，它指示模型可使用哪些工具。
 下面展示了一个格式化的数据点示例，其中系统提示和可用工具以JSON格式呈现：
 ```xml
 <system>
@@ -119,7 +129,6 @@ You are a function-calling AI model. You are provided with function signatures w
           "description": "The unique identifier for the movie."
         }
       },
-      },
       "required": ["movie_id"]
     }
   },
@@ -152,7 +161,7 @@ You are a function-calling AI model. You are provided with function signatures w
 ...
 </user>
 ```
-在语言模型生成过程中，如果遵循上述示例，它将生成 `search_movies("Star Wars")` 这些 token 来搜索《星球大战》。
+语言模型在生成completion时，如果遵循上述示例，它将生成 `search_movies("Star Wars")` 这些 token 来搜索《星球大战》。
 这通常被编码在特殊的格式化 token 内，随后插入序列的下一批 token 将包含 tool 的输出。
 借助这一机制，模型能够完成比许多简单独立模型更具挑战性的任务。
 
@@ -164,7 +173,7 @@ You are a function-calling AI model. You are provided with function signatures w
 What is the 50th Fibonacci number? (Use the standard F_0=0, F_1=1 indexing.)</s>
 <|assistant|>
 <think>
-Okay, I will compute the 50-th Fibonacci number with a simple loop, then return the result.
+Okay, I will compute the 50th Fibonacci number with a simple loop, then return the result.
 
 <code>
 def fib(n):
@@ -181,7 +190,7 @@ fib(50)
 </output>
 </think>
 <answer>
-The 50-th Fibonacci number is 12 586 269 025.
+The 50th Fibonacci number is 12 586 269 025.
 </answer>
 ```
 
@@ -200,12 +209,12 @@ while True:
         messages.append({"role": "tool", "tool_call_id": call.id, "content": result})
 ```
 
-![Tool use 将模型生成与外部执行交织在一起：模型持续生成 token，直到发出一个 tool call（橙色），外部系统执行该 tool 并将输出（紫色）注入序列，随后模型继续生成。模型可以在单次生成中发出多个 tool call。在训练过程中，tool call 和输出 token 通常会从损失中被掩盖掉。](images/tool_use_generation.png){#fig:tool-use-generation}
+![Tool use 将模型生成与外部执行交织在一起：模型持续生成 token，直到发出一个 tool call（橙色），外部系统执行该 tool 并将输出（紫色）注入序列，随后模型继续生成。模型可以在单次生成中发出多个 tool call。在训练过程中，tool call 和输出 token 通常会从损失中被掩盖掉。](images/tool_use_generation.png){#fig:tool-use-generation data-dark-src="images/tool_use_generation-dark.png"}
 
 针对 tool use 的训练，核心在于让模型在这种不同的 token 流中表现出可预测的行为——知道何时发出 tool call、如何正确格式化参数，以及如何将结果整合到其响应中。
 开放模型必须经过训练，才能与用户可能直接接入的各种 tool 协同工作。
 
-## 多步 Tool 推理
+## 多步骤 Tool 推理
 
 OpenAI 的 o3 模型代表了多步 tool use 与语言模型集成方式上的一次重大跨越。
 这一行为与社区更早期的研究趋势密切相关。
@@ -214,8 +223,11 @@ OpenAI 的 o3 模型代表了多步 tool use 与语言模型集成方式上的�
 > 在本文中，我们探索了利用 LLM 以交错方式同时生成推理轨迹和特定任务动作的方法，从而实现两者之间更强的协同效应：推理轨迹帮助模型推导、跟踪和更新行动计划，并处理异常情况；而动作则使模型能够与知识库或环境等外部信息源进行交互并获取额外信息。
 
 随着 tool use 能力的稳固以及推理模型的兴起，多轮 tool use 已成为一个令人振奋的研究领域 [@wang2025ragenunderstandingselfevolutionllm]。
+使用RL训练这些多步骤行为，比逐样本的RLHF循环更接近经典强化学习：agent在获得任何reward之前，需要在完整的trajectory中与环境及其工具进行交互，如@fig:tool-use-rl所示。
 
-## Model Context Protocol（MCP）
+![面向多步骤tool use的强化学习。从训练数据中采样一个prompt，agent（policy $\pi_\theta$）在一条trajectory上与环境及其工具交互，交替产生动作 $a_t$ 与观测 $o_t$。完整的trajectory经过评分或验证，在末尾产生单一的reward $r_T$，并由其驱动policy更新。与逐样本的RLHF循环不同，reward仅在多步骤rollout之后才会出现——更接近经典RL。](images/tool_use_rl_loop.png){#fig:tool-use-rl data-dark-src="images/tool_use_rl_loop-dark.png"}
+
+## Model Context Protocol
 
 Model Context Protocol（MCP）是一项用于将语言模型连接到外部数据源和信息系统的开放标准 [@anthropic_mcp_2024]。
 在数据层，MCP 使用 JSON-RPC 2.0，并为其原语提供发现和执行方法。
@@ -280,8 +292,8 @@ async def call_tool(name: str, arguments: dict):
 
 在实现 tool use 模型时，有多项格式化与掩码处理方面的决策需要考量：
 
-- **Python 与 JSON 格式**：本章中，我们提供了将 tool use 格式化为 JSON 数据结构和 Python 代码的两种示例。模型通常会选择其中一种结构，业界不同提供商采用不同的格式。
-- **掩码 tool 输出**：训练 tool use 模型时，一个重要细节是将 tool 输出中的 token 从模型的训练损失中屏蔽掉。这确保了模型不会学习预测系统输出——因为这些内容并非模型在实际使用中直接生成的（类似于其他后训练阶段对 prompt 进行掩码的做法）。
+- **Python 与 JSON 格式**：本章中，我们提供了将 tool use 格式化为 JSON 数据结构和 Python 代码的两种示例。模型通常会选择其中一种结构，而业界不同提供商采用不同的格式。
+- **掩码 tool 输出**：训练 tool use 模型时，一个重要细节是将 tool 输出中的 token 从模型的训练损失中屏蔽掉。这确保了模型不会学习预测处理 tool call 的系统所产生的输出（因为这些结果并非由模型生成的 token）。
 - **tool 调用的多轮格式**：在实现 tool calling 模型时，通常的做法是为数据加载格式增加更多结构。后训练 dataset 的标准格式是用户与助手交替出现的消息列表（通常还包含一条系统消息）。tool use 的整体结构相同，但模型的回合被拆分为以每次 tool call 为分隔符的内容子段。以下是一个示例。
 
 ```python
@@ -309,8 +321,8 @@ messages = [
 
 - **Tokenization 与消息格式细节**：OpenAI messages 格式中的 tool call 通常通过 chat template（控制发送给模型的消息格式的代码）进行 tokenization，将结构化的 JSON 表示转换为原始 token 流。这一过程因模型架构而异——有些使用特殊 token 来标记 tool call，另一些则在 token 流内部保持结构化格式。[Chat template playground](https://huggingface.co/spaces/huggingfacejs/chat-template-playground?modelId=Qwen/Qwen3-8B) 提供了一个交互式环境，可用于探索不同模型如何将消息格式转换为 token 流。
 - **推理 token 连续性**：随着推理模型的兴起（在给出答案之前会有独立的"推理"token 流），目前存在多种实现方案来处理推理 token 与 tool use 协同工作的问题。部分模型会在单个回合内的多次 tool calling 步骤之间保留推理 token，以维持跨多次 tool 调用的上下文。然而，这些 token 通常在回合之间被清除，以降低服务成本（但并非总是如此——这属于设计决策）。
-- **各提供商的 API 格式**（截至 2025 年 7 月）：不同提供商采用概念相似但技术上有所区别的格式。OpenAI 使用带唯一 ID 的 `tool_calls` 数组，Anthropic 使用带 `<thinking>` 标签的详细 `input_schema` 规范，Gemini 则提供 function calling 模式（AUTO/AUTO/NONE）。通过 API 使用这些模型时，可用的 tool 以 JSON 格式定义，模型响应中的 tool 输出则存储在与标准"生成 token"不同的字段中。另一个示例是，开源推理代码库 vLLM 实现了大量解析逻辑，支持多种 tool calling 模式和针对不同模型的解析器，为底层实现细节提供了参考 [@kwon2023efficient]。
-- **schema 一致性与受约束解码**：生产系统通常使用受约束解码或"严格模式"选项来强制输出有效的 JSON 和正确的参数类型，从而减少因格式错误输出导致的重试。部分闭源模型提供商会专门针对结构化 JSON 输出的可靠性进行额外的后训练；而对于开源模型，这通常作为 VLLM 等系统中的推理标志来处理。
+- **各提供商的 API 格式**（截至 2026 年 5 月）：不同提供商采用概念相似但技术上有所区别的格式。OpenAI 的 Chat Completions API 使用带唯一 ID 的 `tool_calls` 数组，而较新的 Responses API 则将调用表示为 `function_call` 条目，并以 `call_id` 为键将结果作为 `function_call_output` 条目返回。Anthropic 使用 `input_schema` 定义 tool，并将调用和结果表示为 `tool_use` 和 `tool_result` 内容块。Gemini 提供 `AUTO`、`ANY`、`NONE` 等 function calling 模式，在受支持的 Gemini 和 Vertex AI 配置中还有 `VALIDATED`。
+- **schema 一致性与受约束解码**：生产系统通常使用受约束解码或"严格模式"选项来强制输出有效的 JSON 和正确的参数类型，从而减少因格式错误输出导致的重试。部分闭源模型提供商会专门针对结构化 JSON 输出的可靠性进行额外的后训练；而对于开源模型，这通常作为 vLLM 等系统中的推理标志来处理。
 - **tool 输出的上下文消耗**：tool 输出（尤其是搜索或检索类 tool 返回大量结果时）可能迅速占满模型的上下文窗口。系统必须决定如何对 tool 输出进行截断、摘要或分页，以在保持上下文可管理的同时保留模型继续运行所需的信息。
 
 将这一切与后训练联系起来：tool use 的训练数据从哪里来，使用什么目标函数？

@@ -1,4 +1,4 @@
-<!-- source-commit: 02c6d49 -->
+<!-- source-commit: eecc49e -->
 <!--
   Copyright (c) 2025-2026 Nathan Lambert.
   Licensed under CC BY-NC-SA 4.0:
@@ -6,14 +6,18 @@
   Full license: https://github.com/natolambert/rlhf-book/blob/main/LICENSE-CHAPTERS
 -->
 ---
-prev-chapter: "关键相关工作"
+prev-chapter: "RLHF 简史"
 prev-url: "02-related-works"
 page-title: 训练概述
 search-title: "第三章：训练概述"
+meta-description: "现代 post-training 方案的高层概览，包括 instruction tuning、RLHF、RLVR 以及 direct alignment 方法。"
 next-chapter: "指令微调"
 next-url: "04-instruction-tuning"
-lecture-video: "https://youtu.be/o6l6tJQgUg4"
-lecture-label: "第一讲：概述（第一至三章）"
+lectures:
+  - video: "https://www.youtube.com/watch?v=MMDNaeIFVy8&list=PLL1tdVxB1CpVpEtMHxwuR4uI4Lxjw00_y&index=2"
+    label: "第零讲：先修知识"
+  - video: "https://www.youtube.com/watch?v=o6l6tJQgUg4&list=PLL1tdVxB1CpVpEtMHxwuR4uI4Lxjw00_y&index=2"
+    label: "第一讲：概述（第一至三章）"
 ---
 
 # 训练概述
@@ -39,14 +43,14 @@ $$p_{\pi}(\tau)=\rho_0(s_0)\prod_{t=0}^{T-1}\pi(a_t\mid s_t)\,p(s_{t+1}\mid s_t,
 
 在时间跨度为 $T$ 的有限回合中，RL 智能体的目标是求解以下优化问题，其中 $\gamma$ 是取值在 0 到 1 之间的 discount factor，用于平衡近期奖励与未来奖励的权重：
 
-$$\max_\pi \; \mathbb{E}_{\tau \sim p_{\pi}} \left[ \sum_{t=0}^{T-1} \gamma^t r(s_t, a_t) \right],$$ {#eq:rl_opt}
+$$\max_\pi \; \mathbb{E}_{\tau \sim p_{\pi}} \left[ \sum_{t=0}^{T-1} \gamma^t r(s_t, a_t) \right].$$ {#eq:rl_opt}
 
 给定 policy 的期望回报通常记为 $J(\pi)$，最优值记为 $J^* = \max_\pi J(\pi)$。
 
 对于持续性任务，通常令 $T\to\infty$ 并依赖折扣（$\gamma<1$）使目标保持有界。
 优化该表达式的多种方法将在第六章讨论。
 
-![标准 RL 循环](images/rl.png){#fig:rl width=320px .center}
+![标准 RL 循环](images/rl.png){#fig:rl width=320px .center data-dark-src="images/rl-dark.png"}
 
 @fig:rl 展示了标准 RL 循环的示意图（可与 @fig:rlhf 中的 RLHF 循环对比）。
 
@@ -59,26 +63,26 @@ $$\max_\pi \; \mathbb{E}_{\tau \sim p_{\pi}} \left[ \sum_{t=0}^{T-1} \gamma^t r(
 - **状态 ($s_t$)**：当前室温，例如 65$^\circ$F。
 - **动作 ($a_t$)**：打开或关闭加热器。
 - **Reward ($r$)**：当温度在目标值 2$^\circ$ 范围内时为 +1，否则为 0。
-- **Policy ($\pi$)**：根据当前温度决定是否开启加热器的规则。恒温器可能学到的一种 policy（根据环境的具体转移动力学，该 policy 不一定是最优的）：
+- **Policy ($\pi$)**：根据当前温度决定是否开启加热器的规则。下面是恒温器可能学到的一种 policy（根据环境的具体转移动力学，该 policy 不一定是最优的）：
 
 $$\pi(a_t = \text{on} \mid s_t) = \begin{cases} 1 & \text{if } s_t < 70^{\circ}\text{F} \\ 0 & \text{otherwise} \end{cases}$$ {#eq:thermostat_policy}
 
 - **转移**：加热器开启时房间升温，关闭时降温。智能体通过其动作影响这些动力学，但底层物理——房间升降温的速度——不在其控制之内。
 
-![trajectory 分布（@eq:rl_dynam）中每个项与恒温器 RL 示例的映射关系。](images/thermostat_equation.png){#fig:thermostat-equation .center}
+![trajectory 分布（@eq:rl_dynam）中每个项与恒温器 RL 示例的映射关系。](images/thermostat_equation.png){#fig:thermostat-equation .center data-dark-src="images/thermostat_equation-dark.png"}
 
-初始时，恒温器的 policy 基本上是随机的——它无视当前温度随意开关加热器，导致室温剧烈波动。
+初始时，恒温器的 policy 基本上是随机的——它无视当前温度随意开关加热器，导致房间温度剧烈波动。
 经过多轮反复试错，智能体发现在房间冷时开启加热器、热时关闭加热器能获得更多 reward，并逐渐收敛到一个合理的 policy。
 这正是 RL 的核心循环：观察状态，选择动作，获得 reward，更新 policy 以随时间获得更多 reward。
 
-### RL 任务示例：CartPole
+### 经典 RL 示例：CartPole
 
 作为具有连续动力学的更丰富示例，考虑经典的 *CartPole*（倒立摆）控制任务，该任务出现在众多 RL 教材、课程乃至研究论文中。
-与恒温器只有单一状态变量和二值动作不同，CartPole 涉及四个连续状态变量和基于物理的转移——使其成为 RL 算法的标准基准。
+鉴于恒温器只有单一状态变量和二值动作不同，CartPole 涉及四个连续状态变量和基于物理的转移——使其成为 RL 算法的标准基准。
 
-![CartPole 环境，展示状态变量 ($x$, $\dot{x}$, $\theta$, $\dot{\theta}$) 和动作 ($\pm F$)。](images/cartpole.png){#fig:cartpole width=400px .center}
+![CartPole 环境，展示状态变量 ($x$, $\dot{x}$, $\theta$, $\dot{\theta}$) 和动作 ($\pm F$)。](images/cartpole.png){#fig:cartpole width=400px .center data-dark-src="images/cartpole-dark.png"}
 
-- **状态 ($s_t$)**：小车位置/速度和杆的角度/角速度，
+- **状态 ($s_t$)**：小车位置/速度和杆的角度/角速度：
 
   $$s_t = (x_t,\,\dot{x}_t,\,\theta_t,\,\dot{\theta}_t).$$ {#eq:cartpole_state}
 
@@ -86,7 +90,7 @@ $$\pi(a_t = \text{on} \mid s_t) = \begin{cases} 1 & \text{if } s_t < 70^{\circ}\
 
 - **Reward ($r$)**：一种简单的 reward 设定为：每步杆保持平衡且小车留在轨道上（例如 $|x_t| \le 2.4$ 且 $|\theta_t| \le 12^\circ$），则 $r_t = 1$；一旦违反任一边界，回合终止。
 
-- **动力学/转移 ($p(s_{t+1}\mid s_t,a_t)$)**：在许多环境中，动力学是确定性的（即 $p$ 为点质量），可以通过步长为 $\Delta t$ 的欧拉积分写成 $s_{t+1} = f(s_t,a_t)$。标准简化 CartPole 更新使用以下常数：小车质量 $m_c$、杆质量 $m_p$、杆半长 $l$ 和重力加速度 $g$（$\alpha$ 是质量归一化的具有加速度量纲的中间量）：
+- **动力学/转移 ($p(s_{t+1}\mid s_t,a_t)$)**：在许多环境中，动力学是确定性的（即 $p$ 为点质量），可以通过步长为 $\Delta t$ 的欧拉积分写成 $s_{t+1} = f(s_t,a_t)$。标准简化 CartPole 更新使用如下常数：小车质量 $m_c$、杆质量 $m_p$、杆半长 $l$ 和重力加速度 $g$（$\alpha$ 是质量归一化的具有加速度量纲的中间量）：
 
   $$\alpha = \frac{a_t + m_p l\,\dot{\theta}_t^2\sin\theta_t}{m_c + m_p}$$ {#eq:cartpole_temp}
 
@@ -118,8 +122,6 @@ RLHF 的 RL 建模被视为一个开放性较低的问题，其中 RL 的若干�
 | 动作 | 单个环境动作 $a_t$ | 从 $\pi_\theta(\cdot\mid x)$ 中采样的补全 $y$（一个 token 序列） |
 | Reward 粒度 | 通常逐步/细粒度 | 通常在完整补全上响应级别（bandit 风格），通常不折扣（$\gamma = 1$） |
 | 时间跨度 | 多步回合（$T>1$） | 通常单步（$T=1$），但多轮对话可建模为更长时间跨度 |
-表：标准 RL 与用于语言模型的 RLHF 之间的关键差异。 {#tbl:rl-vs-rlhf}
-:::
 表：标准 RL 与面向语言模型的 RLHF 之间的主要差异。{#tbl:rl-vs-rlhf}
 :::
 
@@ -128,7 +130,7 @@ $$\max_\pi \; \mathbb{E}_{\tau \sim \pi} \left[r_\theta(s_t, a_t) \right].$$ {#e
 
 从许多角度来看，结论是：尽管 RLHF 在很大程度上受到 RL 优化器和问题建模方式的启发，但其实际实现与传统 RL 存在本质上的区别。
 
-![标准 RLHF 循环](images/rlhf.png){#fig:rlhf}
+![标准 RLHF 循环](images/rlhf.png){#fig:rlhf data-dark-src="images/rlhf-dark.png"}
 
 ### 微调与正则化
 
@@ -149,7 +151,7 @@ $$\max_\pi \; \mathbb{E}_{\tau \sim \pi} \left[r_\theta(s_t, a_t)\right] - \beta
 本书详细介绍了求解上述优化问题的多种流行技术。
 post-training 的主要工具包括：
 
-- **Reward modeling**（第 5 章）：训练一个模型以捕捉从收集到的偏好数据中提取的信号，并能够输出表示未来文本质量的标量奖励。
+- **Reward modeling**（第 5 章）：一个模型被训练以捕捉从收集到的偏好数据中提取的信号，并能够输出表示未来文本质量的标量奖励。
 - **Instruction fine-tuning**（第 4 章）：RLHF 的前置步骤，通过模仿预先筛选的示例，使模型学习当今语言模型交互中广泛使用的问答格式。
 - **Rejection sampling**（第 9 章）：最基础的 RLHF 技术，通过 reward model 对 instruction fine-tuning 候选补全结果进行过滤，以模拟人类偏好。
 - **Policy gradients**（第 6 章）：强化学习算法，用于 RLHF 的经典示例中，根据 reward model 提供的信号更新语言模型的参数。
@@ -157,16 +159,16 @@ post-training 的主要工具包括：
 
 经过现代 RLHF 训练的模型，始终采用 instruction fine-tuning 加上上述其他优化选项混合使用的方式。
 
-## RL 在 post-training 语言模型中的微妙优势
+### RL 在 post-training 语言模型中的微妙优势
 
 在后续章节中，我们将介绍多种 post-training 优化工具。
 其中不少工具，例如 rejection sampling（第 9 章）和 DPO 等 direct alignment algorithms（第 8 章），比让 RL 正常运转要简单得多。
 尽管如此，尽管替代方案更为简便，基于 RL 的方法仍然持续胜出。
-某些趋势是显而易见的，例如利用可验证奖励强化学习（RLVR）实现推理时扩展；但更广泛地说，RL 已被证明是非常适合语言模型的优化工具。
-相比 instruction tuning 或 DPO 类算法，实现 RL 需要投入大得多的基础设施成本，但冒着过于通俗的风险来说——它所提供的梯度更新"总体上对模型大有裨益"。
+某些趋势是显而易见的，例如利用可验证奖励强化学习（RLVR）实现推理时扩展，是显而易见的；但 RL 已被证明是非常适合语言模型的优化工具。
+相比 instruction tuning 或 DPO 类算法，实现 RL 需要投入大得多的基础设施成本，但冒着过于通俗的风险来说，它所提供的梯度更新"总体上对模型大有裨益"。
 这一点难以量化，但具体体现在以下几种反复出现的形式中：
 
-- RL 阶段可以"修复"模型的粗糙之处，使其更易于对话或更加鲁棒（例如，通过训练使其在 vLLM 等推理工具中具备数值稳定性）。其确切原因在文献中尚不明确，但这一事实在 RL 日益普及的趋势中得到了印证。
+- RL 阶段可以"修复"模型的粗糙之处，使模型更易于对话或更加鲁棒（例如，通过训练使其在 vLLM 等推理工具中具备数值稳定性）。其确切原因在文献中尚不明确，但这一事实在 RL 日益增长的普及程度中得到了印证。
 - RL 可以精准施用——模型能够很好地学习 prompt 分布所在位置，RL 通常不会"压制"模型的通用能力。一个典型例子是 Tülu 3 仅在数学 prompt 上进行 RL 训练，同时在广泛的任务套件中保持了整体能力 [@lambert2024t]。
 
 总体而言，作用于语言模型的 RL 损失具有鲁棒、可扩展、有效且灵活的特点，由此开辟了大量新的实验方向。
@@ -179,20 +181,20 @@ post-training 的主要工具包括：
 随着方案的老化，以相同特性训练模型变得越来越容易，所需数据也越来越少。
 总体趋势是，post-training 涉及更多优化步骤、更多训练算法，以及更多样化的训练数据集和评估基准。
 
-### InstructGPT
+### InstructGPT：RLHF 的基础工具
 
 在 ChatGPT 首次问世前后，被广泛接受的（"经典"）语言模型 post-training 方法包含三个主要步骤，其中 RLHF 是核心环节 [@lambert2022illustrating] [@ouyang2022training] [@bai2022training]。
 在"基础"语言模型（即在大规模网络文本上训练的下一词预测模型）之上所采取的三个步骤，总结如下（见 @fig:rlhf-basic-repeat）：
 
 1. **在约 1 万条示例上进行 instruction tuning**：这一步骤教会模型遵循问答格式，并从以人工书写数据为主的数据中学习一些基础技能。
-2. **在约 10 万对成对 prompt 上训练 reward model**（论文使用了 3.3 万个 prompt）：该模型从 instruction-tuned 检查点开始训练，捕捉希望在最终训练中建模的多元价值观。reward model 是 RLHF 的优化目标。
-3. **在单独的约 10 万个 prompt 上使用 RLHF 训练 instruction-tuned 模型**（论文使用了恰好 3.1 万个，是否以及在多大程度上复用了其他阶段的 prompt 未有记录）：模型在生成回复后接受评分，针对 reward model 进行优化。
+2. **在约 10 万个带有成对 completion 的 prompt 上训练 reward model**（论文使用了 3.3 万个 prompt）：该模型从 instruction-tuned 检查点开始训练，捕捉希望在最终训练中建模的多元价值观。reward model 是 RLHF 的优化目标。
+3. **在单独的约 10 万个 prompt 上使用 RLHF 训练 instruction-tuned 模型**（论文使用了恰好 3.1 万个，且未记录 prompt 是否复用自其他阶段）：模型在生成回复后接受评分，针对 reward model 进行优化。
 
 RLHF 完成后，模型即可部署给用户。这一方案是现代 RLHF 的基础，但方案已大幅演进，涵盖了更多阶段和更多数据。
 
 ![早期三阶段 RLHF 流程示意图，包含 SFT、reward model 以及随后的优化。](images/rlhf-basic.png){#fig:rlhf-basic-repeat}
 
-### Tülu 3
+### Tülu 3：向 Instruct 模型引入 RLVR
 
 现代版本的 post-training 涉及更多、更多的模型版本和训练阶段（例如，Llama 2 所记录的 RLHF 步骤已超过 5 个 [@touvron2023llama]）。
 下图 @fig:rlhf-complex 展示了一个示例，其中模型经历了多次训练迭代才达到收敛。
@@ -200,7 +202,7 @@ RLHF 完成后，模型即可部署给用户。这一方案是现代 RLHF 的基
 ![现代 post-training 多轮训练示意图。](images/rlhf-complex.png){#fig:rlhf-complex}
 
 这一时代及之后训练的最复杂模型尚未公开其完整训练过程的详细信息。
-截至 2025 年，ChatGPT 或 Claude 等领先模型涉及多轮迭代训练。
+到 2026 年，ChatGPT 或 Claude 等领先模型涉及多轮迭代训练。
 这甚至可能包括训练专用模型后再将权重合并以获得能胜任多个子任务的最终模型等技术 [@li2022branch]（例如 Cohere 的 Command A [@cohere2025command]）。
 
 ![Tülu 3 方案总结，包含目标技能与多步训练方案。Lambert et al. 2024，许可协议 CC-BY。](images/tulu3.png){#fig:tulu-3}
@@ -209,20 +211,47 @@ Tülu 3 是这种以 RLHF 为核心的多阶段 post-training 方法的一个完
 Tülu 3 方案由三个阶段组成：
 
 1. **在约 100 万条示例上进行 instruction tuning**：这一以合成数据为主的数据集，从 GPT-4o 和 Llama 3.1 405B 等前沿模型中混合提取，教会模型通用的指令遵循能力，并为数学和编程等能力奠定基础。
-2. **在约 100 万对偏好对上进行 on-policy 偏好数据训练**：这一阶段大幅提升了模型的对话流畅度（例如在 Arena（原 ChatBotArena）或 AlpacaEval 2 上的表现），同时进一步改善了 instruction tuning 阶段提及的各项技能。
+2. **在约 100 万对偏好对上进行 on-policy 偏好数据训练**：这一阶段大幅提升了模型的对话流畅度（例如在 Arena（原 Chatbot Arena）或 AlpacaEval 2 上的表现），同时进一步改善了 instruction tuning 阶段提及的各项技能。
 3. **在约 1 万个 prompt 上进行可验证奖励强化学习（RLVR）**：这一小规模强化学习训练旨在提升数学等核心技能，同时维持整体性能（现被视为 DeepSeek R1 等现代推理模型的先驱）。
 
 该方案已成功应用于 Llama 3.1 [@lambert2024t]、OLMo 2 [@olmo20242] 以及 SmolLM 系列模型 [@alrashed2024smoltulu]。
 
-### DeepSeek R1
+### DeepSeek R1：为推理扩展 RLVR
 
 随着推理语言模型（如 OpenAI 的 o1）的兴起，post-training 的最佳实践再次演进，对各训练阶段的计算资源分配进行了重新排列和再分配。
 目前对推理模型 post-training 方案记录最为清晰的是 DeepSeek R1 [@guo2025deepseek]，Alibaba 的大型 Qwen 3 模型（即仅限 32B 和 225B MoE 模型）[@yang2025qwen3] 以及小米的 MiMo 7B [@xia2025mimo] 均采用了类似方案。
-DeepSeek 方案如下：
 
-1. **超过 10 万条 on-policy 推理样本的"冷启动"**：这些数据从早期 RL 检查点 R1-Zero 中采样，并经过严格过滤，以在 DeepSeek-V3-Base 上灌输特定的推理过程。DeepSeek 用"冷启动"一词描述从极少量监督数据中学习 RL 的方式。
+![DeepSeek-R1 的多阶段流程。来自 *Nature* 上的 DeepSeek R1 论文，[Fig. 2](https://www.nature.com/articles/s41586-025-09422-z/figures/2)，遵循 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) 许可 [@guo2025deepseek]。](images/deepseek-r1-pipeline.png){#fig:deepseek-r1-pipeline .center}
+
+DeepSeek 方案如 @fig:deepseek-r1-pipeline 所示，如下：
+
+1. **以超过 10 万条 on-policy 推理样本进行"冷启动"**：这些数据从早期 RL 检查点 R1-Zero 中采样，并经过严格过滤，以在 DeepSeek-V3-Base 上灌输特定的推理过程。DeepSeek 用"冷启动"一词描述从极少量监督数据中学习 RL 的方式。
 2. **大规模强化学习训练**：该阶段反复让模型处理推理问题，在多个基准上进行 RLVR，直至"收敛"。
 3. **Rejection sampling 与 SFT**：在接近收敛时，对 RL 检查点应用 rejection sampling 构建约 80 万条样本的 SFT 数据集，然后在约 3/4 推理问题与 1/4 通用查询的过滤混合数据上对模型进行 fine-tune，以得到通用模型。
 4. **混合强化学习训练**：针对推理问题（可验证奖励）与通用偏好调优 reward model 的混合训练，以对模型进行精调。
 
 如上所述，该方案存在演进版本，尤其是步骤 3 和步骤 4，用于在向用户开放前对模型进行最终打磨。
+许多模型从经过定制的 instruction 数据集起步，这些数据集包含 chain-of-thought 序列，并经由现有模型大量过滤和打磨，从而在进入 RL 之前仅靠 SFT 就能快速获得强大的行为 [@seed2025seed]。
+
+### 向 MOPD 与智能体的转变
+
+推理模型的一个关键产品市场契合点是演变为编程智能体，同时伴随着经典 post-training 方案的又一次变化。
+这里有两个关键变化。
+第一，另一种新的训练方法——多教师 on-policy 蒸馏（multi-teacher on-policy distillation，MOPD，见第 12 章）——成为将多种不同技能合并到最终模型中的流行工具。
+第二个变化更简单：post-training 的计算规模持续快速增长，尤其是在强化学习阶段。
+
+小米的 MiMo-V2-Flash 是第一份记录现代 MOPD 流程的技术报告 [@mimo2025flash]，该团队后来还撰写了一篇专门讨论该主题的论文 [@ma2026mopd]。该技术报告以简单的形式总结了这类 post-training 方案，如 @fig:rlhf-mopd 所示：先进行通用 SFT，再训练领域专精的教师模型（更多 SFT 和大量 RL），然后使用多教师 on-policy 蒸馏（MOPD）将它们合并为最终模型。
+其他模型也采用这种形式的方案，例如 NVIDIA 的 Nemotron 3 Ultra [@nvidia2026nemotron3ultra]，它与之大体相似，但在各专家之间进行了两个连续的 MOPD 阶段。
+总体而言，这些方案在迭代模型版本（方案的*深度*）方面复杂度较低，但在需要专精众多关键专家（一种*广度*）方面复杂度更高。请注意，上一代 post-training 同样处理广泛的任务，但在训练过程中划分得没那么细，即大多数任务是在相同的训练阶段中训练的。
+
+![使用 MOPD 的专家式 post-training 示意图：共享 SFT，领域专属 SFT 与 RL，然后通过多教师 on-policy 蒸馏得到一个（最终的）学生模型。](images/rlhf-mopd.png){#fig:rlhf-mopd data-dark-src="images/rlhf-mopd-dark.png"}
+
+采用 MOPD 作为最终阶段的各个模型使用的专家数量各不相同：Nemotron 3 Ultra 超过十个 [@nvidia2026nemotron3ultra]，Kimi K3 为九个 [@kimiteam2026kimik3]，DeepSeek V4 超过十个 [@deepseekai2026deepseekv4]（小米 MiMo V2 未报告专家数量）。
+
+不同模型的 post-training 方案仍然差异很大。
+MOPD 是一种流行的新工具，但各实验室远未一致采用。随着 post-training 逐渐成熟、工具箱中的工具日益增多，方案的差异性也随之增大。
+例如，GLM-5 使用了 MOPD，但在 MOPD 之前详细描述了一个更复杂的三阶段 RL 过程，如 @fig:rlhf-sequential-rl 所示 [@glm5team2026glm5]。
+
+![GLM-5 的整体训练流程。来自 GLM-5 团队的论文，[Fig. 5](https://arxiv.org/pdf/2602.15763v2#page=4)，遵循 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) 许可 [@glm5team2026glm5]。](images/glm5-pipeline.png){#fig:rlhf-sequential-rl}
+
+随着 post-training 对现代模型性能越来越核心，方案将持续演进，以反映这一过程在难度、任务和目标上的新规模扩展。

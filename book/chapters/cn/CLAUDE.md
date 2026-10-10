@@ -4,6 +4,30 @@ This directory contains the Chinese translation of all book chapters.
 Each file mirrors its English counterpart in `book/chapters/` and begins
 with `<!-- source-commit: <hash> -->` recording the last-synced commit.
 
+## How to pull upstream changes and sync
+
+### 0. Merge upstream
+
+The English book lives in `natolambert/rlhf-book`; this fork only adds the
+translation (`book/chapters/cn/`), the CN page generation, and a GitHub Pages
+workflow.
+
+```bash
+git remote add upstream https://github.com/natolambert/rlhf-book.git   # once
+git fetch upstream main
+git merge upstream/main
+```
+
+Conflicts are usually limited to `Makefile` and `.github/workflows/static.yml`
+(keep the fork's GitHub Pages workflow; keep the `nested_cn_html` /
+`CN_TEMPLATE_*` additions in the Makefile).
+
+CN page templates (`chapter-cn.html`, `nav-cn.js`, footer) are **generated** at
+build time from upstream's `chapter.html` / `nav.js` / `footer.html` by
+`book/scripts/make_cn_templates.py` (relative links + translated labels). If
+upstream renames a nav entry, the script prints a `warning: ... pattern not
+found` — add the new label to `NAV_LABELS` there.
+
 ## How to sync a file after the original changes
 
 ### 1. Find what changed
@@ -43,7 +67,7 @@ Agents that try to translate an entire large file in one pass will time out.
 After updating a file, change the first line to the current HEAD:
 
 ```bash
-CURRENT=$(git rev-parse --short HEAD)
+CURRENT=$(git rev-parse --short upstream/main)   # last upstream commit whose text you translated
 # Replace the source-commit line at the top of the translated file
 sed -i "1s/.*/<!-- source-commit: $CURRENT -->/" book/chapters/cn/01-introduction.md
 ```

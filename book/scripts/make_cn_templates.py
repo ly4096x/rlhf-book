@@ -7,7 +7,8 @@ UI labels are translated. Deriving the files at build time means upstream
 template changes flow into the CN site without hand-merging.
 
 Usage: make_cn_templates.py <output-dir>
-Writes: chapter-cn.html, footer.html, nav-cn.js
+Writes: chapter-cn.html, footer.html, nav-cn.js, style.css (pandoc resolves the
+$style.css()$ / $footer.html()$ partials next to the template)
 """
 import re
 import sys
@@ -120,6 +121,7 @@ def main():
     (out / "chapter-cn.html").write_text(make_chapter((TEMPLATES / "chapter.html").read_text()))
     (out / "footer.html").write_text(make_footer((TEMPLATES / "footer.html").read_text()))
     (out / "nav-cn.js").write_text(make_nav((TEMPLATES / "nav.js").read_text()))
+    (out / "style.css").write_text((TEMPLATES / "style.css").read_text())
 
 
 if __name__ == "__main__":

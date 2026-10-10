@@ -1,4 +1,4 @@
-<!-- source-commit: 02c6d49 -->
+<!-- source-commit: eecc49e -->
 <!--
   Copyright (c) 2025-2026 Nathan Lambert.
   Licensed under CC BY-NC-SA 4.0:
@@ -10,20 +10,26 @@ prev-chapter: "主页"
 prev-url: "https://rlhfbook.com/"
 page-title: 引言
 search-title: "第1章：引言"
-next-chapter: "关键相关工作"
+meta-description: "从第一性原理介绍RLHF、它如何改变language models，以及它如何成为现代post-training的一部分。"
+next-chapter: "RLHF简史"
 next-url: "02-related-works"
-lecture-video: "https://youtu.be/o6l6tJQgUg4"
-lecture-label: "第一讲：概览（第1–3章）"
+lectures:
+  - video: "https://www.youtube.com/watch?v=MMDNaeIFVy8&list=PLL1tdVxB1CpVpEtMHxwuR4uI4Lxjw00_y&index=2"
+    label: "第零讲：预备知识"
+  - video: "https://www.youtube.com/watch?v=o6l6tJQgUg4&list=PLL1tdVxB1CpVpEtMHxwuR4uI4Lxjw00_y&index=2"
+    label: "第一讲：概览（第1–3章）"
 ---
 
 # 引言
 
-Reinforcement learning from Human Feedback（RLHF）是一种将人类信息融入AI系统的技术。
+Reinforcement learning from human feedback（RLHF）是一种将人类信息融入AI系统的技术。
 RLHF主要作为解决难以明确描述的问题的方法而兴起。
 对于那些专为人类直接使用而设计的系统，由于个体偏好往往难以言表，此类问题随时都会出现。这涵盖了与数字系统交互的每一个内容领域。
 RLHF早期的应用通常集中在控制问题以及其他传统的reinforcement learning（RL）领域，目标是优化特定行为以完成任务。
 RLHF领域诞生的核心理念是："我们能否仅凭基本的偏好信号来引导优化过程，从而解决困难问题？"
 RLHF最广为人知是通过ChatGPT的发布，以及随之而来的large language models（LLMs）和其他foundation models的快速发展。
+
+## RLHF的三个步骤
 
 RLHF的基本pipeline包含三个步骤。
 首先，需要训练一个能够遵循用户问题的language model（见第4章）。
@@ -104,7 +110,7 @@ RLHF是这一转变的核心所在。
 
 
 另一方面，格式指的是答案的结构方式。
-现代模型以大量使用包含列表、换行符和emoji的markdown格式著称。
+现代模型以大量使用包含列表、换行符和emoji的Markdown格式著称。
 请考虑以下问题的两种截然不同的回答：
 
 > **用户**：我怎样才能提高睡眠质量？
@@ -118,7 +124,24 @@ RLHF是这一转变的核心所在。
 > **Response**: Better sleep, in practice
 > 
 > **Goal**: make your schedule predictable and your environment boring enough that your brain gives up.
+> 
+> **Tonight (quick wins)**:
 >
+> 1. Dim lights for the last hour before bed.
+> 2. No caffeine after lunch; keep alcohol minimal.
+> 3. If you’re stuck awake, get up and do something quiet until sleepy again.
+> 
+> **Daily basics (most impact)**:
+>
+> - Same wake time (even weekends) --> anchors your body clock.
+> - Morning light for 5-10 minutes --> helps set circadian rhythm.
+> - Cool, dark room (fan/eye mask) --> easier to stay asleep.
+> 
+> **If you want a simple rule**:
+> `wake time fixed + caffeine cutoff + wind-down routine`
+> 
+> If sleep problems are persistent or severe, it can be worth talking with a clinician—many issues are very treatable.
+
 Instruction fine-tuning 为模型提供了以问答格式可靠作答的基本能力，而 RLHF 则将这些答案塑造成我们如今期望从 language model 中获得的那种可靠、温暖且引人入胜的回答。
 
 现代研究已将 RLHF 确立为一种将微妙的风格特征及相关行为特征融入模型的通用方法。
@@ -183,7 +206,7 @@ reward model 学习文本中哪些特征更优，因此在推理时（以及在 
 为了使这个例子更易理解，我们将 base model——经过大规模下一个 token 预测预训练后产生的 language model——与构建复杂系统中的其他基础组件进行类比。我们以汽车底盘为例，底盘定义了可以在其上构建汽车的空间。
 以一级方程式（F1）为例：大多数车队在年初都带着全新的底盘和引擎出现。然后，他们花一整年时间在空气动力学和系统改进上（当然，这是一个小小的过度简化），可以显著提升赛车的性能。最优秀的 F1 车队在赛季期间的进步远超底盘更换带来的提升。
 
-post-training 同样如此：当人们越来越了解一个静态 base model 的特点和规律时，便能从中获取大量性能提升。最优秀的 post-training 团队能在极短的时间内提取出大量性能。这套技术涵盖了大部分预训练结束之后的一切内容，包括"mid-training"（如退火/预训练末期高质量网络数据）、instruction tuning、RLVR、preference-tuning 等。一个很好的例子是 Allen Institute for AI 完全开放的小型 Mixture-of-Experts（MoE）模型 OLMoE Instruct 从第一版到第二版的变化。第一版模型于 2024 年秋季发布 [@muennighoff2024olmoe]，第二版仅更新了 post-training，在未改变大部分预训练的情况下，热门 benchmark 的评估均值从 35 提升到了 48 [@ai2_olmoe_ios_2025]。
+post-training 同样如此：当人们越来越了解一个静态 base model 的特点和规律时，便能从中获取大量性能提升。最优秀的 post-training 团队能在极短的时间内提取出大量性能。这套技术涵盖了接近并处于预训练结束之后的一切内容："mid-training"（如退火/预训练末期高质量网络数据）、instruction tuning、RLVR、preference-tuning 等。一个很好的例子是 Allen Institute for AI 完全开放的小型 Mixture-of-Experts（MoE）模型 OLMoE Instruct 从第一版到第二版的变化。第一版模型于 2024 年秋季发布 [@muennighoff2024olmoe]，第二版仅更新了 post-training，在未改变大部分预训练的情况下，热门 benchmark 的评估均值从 35 提升到了 48 [@ai2_olmoe_ios_2025]。
 
 核心思想是：base model 中蕴含着大量的智能和能力，但由于它们只能以下一个 token 预测而非问答格式作答，因此需要通过 post-training 在其周围进行大量构建，才能制造出优秀的最终模型。
 
@@ -196,9 +219,9 @@ post-training 的挑战在于：在将模型从下一个 token 预测重塑为�
 
 与这一理论相关的是 Superficial Alignment Hypothesis（浅层对齐假说），该假说源自论文 LIMA: Less is More for Alignment [@zhou2023lima]。这篇论文在宏观层面上把握住了一些重要的直觉，但理由有误。作者指出：
 
-> 模型的知识和能力几乎完全在预训练期间学得，而对齐（alignment）则告知模型在与用户交互时应使用哪种子分布格式。如果这一假说成立，且对齐在很大程度上关乎学习风格，那么 Superficial Alignment Hypothesis 的一个推论是：只需相当少量的示例，便能对 pretrained language model 进行充分调整 [Kirstain et al., 2021]。
+> 模型的知识和能力几乎完全在预训练期间学得，而对齐（alignment）则告知模型在与用户交互时应使用哪种子分布格式。如果这一假说成立，且对齐在很大程度上关乎学习风格，那么 Superficial Alignment Hypothesis 的一个推论是：只需相当少量的示例，便能对 pretrained language model 进行充分调整。
 
-深度学习的种种成功本应让你深刻认识到：数据规模对性能至关重要。这里的关键区别在于，作者讨论的是对齐与风格——彼时学术 post-training 的关注焦点。通过数千个 instruction fine-tuning 样本，你可以对模型进行实质性改变，并在一组狭窄的评估上取得提升，例如 AlpacaEval、MT Bench、Arena（原名 ChatBotArena，一个用户匿名比较模型 response 的平台）等。这些评估并不总能转化为更具挑战性的能力，这也是 Meta 不会仅用这个 dataset 训练其 Llama Chat 模型的原因。学术研究有其借鉴意义，但若要理解技术发展的整体走向，则需谨慎解读。
+深度学习的种种成功本应让你深刻认识到：数据规模对性能至关重要。这里的关键区别在于，作者讨论的是对齐与风格——彼时学术 post-training 的关注焦点。通过数千个 instruction fine-tuning 样本，你可以对模型进行实质性改变，并在一组狭窄的评估上取得提升，例如 AlpacaEval、MT-Bench、Arena（原名 Chatbot Arena，一个用户匿名比较模型 response 的平台）等。这些评估并不总能转化为更具挑战性的能力，这也是 Meta 不会仅用这个 dataset 训练其 Llama Chat 模型的原因。学术研究有其借鉴意义，但若要理解技术发展的整体走向，则需谨慎解读。
 
 这篇论文所展示的是：你可以用少量样本对模型进行实质性改变。这一点我们早已知晓，对于新模型的短期适配也很重要，但他们关于性能的论断会给普通读者留下错误的教训。
 
@@ -213,31 +236,31 @@ RL 方法在训练前沿 language model 所需算力中所占的比重日益增�
 自 2024 年秋季我们在 Tülu 3 的工作中首次提出 reinforcement learning with verifiable rewards（RLVR）以来 [@lambert2024t]，用于 post-training 的算力规模已大幅增长。
 因推广 RLVR 而广为人知的 DeepSeek R1，在 post-training 中仅使用了其总算力的约 5%——RL 训练消耗 147K H800 GPU 小时 [@guo2025deepseek]，而预训练底层 DeepSeek V3 base model 则消耗了 280 万 GPU 小时 [@deepseekai2025deepseekv3technicalreport]。
 
-截至 2025 年，研究扩展 RL 核心方法的科学显示，单次消融实验可能需要耗费 10-100K GPU 小时 [@khatri2025art]，相当于 OLMo 3.1 Think 32B（2025 年 11 月发布）的 RL 阶段所用算力——该模型在 200 块 GPU 上训练了 4 周 [@teamolmo2025olmo3]。
-截至 2025 年，规模化 post-training 的科学仍处于极早期阶段，正在借鉴预训练 language model 的思路和方法并将其应用于这一新领域，因此确切的 GPU 小时数将会变化，但 post-training 算力投入增加的趋势将持续下去。
+截至 2026 年，研究扩展 RL 核心方法的科学显示，单次消融实验可能需要耗费 10-100K GPU 小时 [@khatri2025art]，相当于 Olmo 3.1 Think 32B（2025 年 11 月发布）的 RL 阶段所用算力——该模型在 200 块 GPU 上训练了 4 周 [@teamolmo2025olmo3]。
+截至 2026 年，规模化 post-training 的科学仍处于极早期阶段，正在借鉴预训练 language model 的思路和方法并将其应用于这一新领域，因此确切的 GPU 小时数将会变化，但 post-training 算力投入增加的趋势将持续下去。
 综合来看，post-training 的激发理论很可能只有在采用较轻量 post-training recipe 时才是正确的视角——这对于专门化一个模型很有用——而对于算力密集型的前沿模型则不尽然。
 
 ## 我们是如何走到这一步的
 
-为什么这本书在现在有其意义？还有多少将会改变？
+为什么这本书在现在有其意义？未来还有多少将会改变？
 
 Post-training——从原始 pretrained language model 中激发强大行为的技艺——自 ChatGPT 的发布重新点燃人们对 RLHF 的兴趣以来，已经历了许多阶段与情绪的变迁。
-在 Alpaca [@alpaca]、Vicuna [@vicuna2023]、Koala [@koala_blogpost_2023] 和 Dolly [@DatabricksBlog2023DollyV1] 的时代，人们使用数量有限的人工数据点以及以 Self-Instruct 风格扩展的大量合成数据，对原始 LLaMA 进行普通 fine-tuning，以获得与 ChatGPT 相似的行为。
+在 Alpaca [@alpaca]、Vicuna [@vicuna2023]、Koala [@koala_blogpost_2023] 和 Dolly [@DatabricksBlog2023DollyV1] 的时代，人们使用数量有限的人工数据点以及以 Self-Instruct 风格扩展的大量合成数据，对原始 LLaMA 进行 fine-tuning，以获得与 ChatGPT 相似的行为。
 这些早期模型的benchmark完全依赖于主观感受（以及人工评估），因为我们都被这些小模型能够在各个领域展现出如此令人印象深刻的行为这一事实所深深吸引。
 这种兴奋是有其道理的。
 
 开放式post-training的发展速度更快，发布的模型更多，也比封闭的同类产品引发了更多关注。
-各家公司都在争先恐后，例如 DeepMind 与 Google 合并，或者新公司刚刚成立，需要时间来跟进。
+各家公司都在争先恐后，例如 DeepMind 与 Google Brain 合并，或者新实验室刚刚成立，需要时间来跟进。
 开放式技术方案经历了一轮又一轮的爆发与滞后交替出现的阶段。
 
 继 Alpaca 等工作之后——即开放式技术方案的第一次滞后期——那个时代的特征是对 reinforcement learning from human feedback（RLHF）的怀疑与质疑。RLHF 是 OpenAI 强调的对第一代 ChatGPT 成功至关重要的技术。
 许多公司怀疑自己是否需要做 RLHF。
-一句流行的话——"instruction tuning 足以实现对齐"——在当时十分盛行，尽管已有大量明显的反例，这种观点至今仍有相当影响力。
+一句流行的话——"instruction tuning 足以实现对齐"——在当时十分盛行，尽管已有明显的证据与之相悖，这种观点至今仍有分量。
 
 对 RLHF 的质疑持续了相当长的时间，在开放社区尤为如此，因为这些团队无力承担数十万至数百万美元量级的数据预算。
 那些早期拥抱 RLHF 的公司最终脱颖而出。
-Anthropic 在 2022 年发表了大量关于 RLHF 的研究，如今被认为拥有最好的 post-training [@askell2021general] [@bai2022training] [@bai2022constitutional]。
-开放团队与封闭团队之间的差距——无论是在复现能力上，还是在了解基本封闭技术上——是一个反复出现的主题。
+Anthropic 在 2022 年发表了大量关于 RLHF 的研究，如今可以说拥有最好的 post-training [@askell2021general] [@bai2022training] [@bai2022constitutional]。
+开放团队（难以复现，甚至不了解基本的封闭技术）与领先的封闭模型之间的差距是一个反复出现的主题。
 
 开放对齐方法和 post-training 领域的第一次重大转变，是 Direct Preference Optimization（DPO）[@rafailov2024direct] 的故事。该工作表明，通过直接对成对偏好数据进行梯度更新，可以用更少的组件来求解与 RLHF 相同的优化问题。
 DPO 论文于 2023 年 5 月发布，但在 2023 年秋季之前，并没有任何明显影响力的模型是用它训练的。
@@ -276,27 +299,27 @@ Post-training 目前的主要创新领域集中在 reinforcement learning with v
 贯穿全书的参考材料和背景知识。
 
 1. 导论：RLHF 概述及本书所提供的内容。
-2. 关键相关工作：RLHF 技术历史中的关键模型和论文。
+2. RLHF简史：RLHF 技术历史中的关键模型和论文。
 3. 训练概述：RLHF 训练目标的设计方式及其理解基础。
 
 #### 核心训练流程
 
 用于优化 language model 以使其与人类偏好对齐的一套技术。
 
-4. Instruction Tuning：将 language model 适配为问答格式。
+4. Instruction Fine-Tuning：将 language model 适配为问答格式。
 5. Reward Modeling：从偏好数据中训练 reward model，作为 RL 训练的优化目标（或用于数据过滤）。
-6. Reinforcement Learning（即 Policy Gradients）：用于在整个 RLHF 过程中优化 reward model（及其他信号）的核心 RL 技术。
+6. Reinforcement Learning：用于在整个 RLHF 过程中优化 reward model（及其他信号）的核心 RL 技术。
 7. 推理与推断时扩展：新型 RL 训练方法在推断时扩展方面相对于 post-training 和 RLHF 的作用。
-8. Direct Alignment 算法：直接从成对偏好数据优化 RLHF 目标、而非先学习 reward model 的算法。
+8. Direct-Alignment 算法：直接从成对偏好数据优化 RLHF 目标、而非先学习 reward model 的算法。
 9. Rejection Sampling：一种将 reward model 与 instruction tuning 结合使用以对齐模型的基本技术。
 
 #### 数据与偏好
 
 为 RLHF 提供驱动力的数据，以及它所尝试解决的宏观问题的背景介绍。
 
-10. 什么是偏好？：为什么需要人类偏好数据来驱动和理解 RLHF。
+10. 偏好的本质：为什么需要人类偏好数据来驱动和理解 RLHF。
 11. 偏好数据：如何为 RLHF 收集偏好数据。
-12. 合成数据与 AI 反馈：从人类数据向合成数据的转变、AI 反馈的工作原理，以及如何从其他模型中提炼知识。
+12. 合成数据：从人类数据向合成数据的转变、AI 反馈的工作原理，以及如何从其他模型中提炼知识。
 13. 工具使用与函数调用：训练模型在输出中调用函数或工具的基础知识。
 
 #### 实践注意事项
@@ -306,14 +329,14 @@ Post-training 目前的主要创新领域集中在 reinforcement learning with v
 14. Over-optimization：关于 RLHF 为何出错以及为何 over-optimization 在以 reward model 为软优化目标时不可避免的定性观察。
 15. 正则化：将这些优化工具约束在参数空间有效区域的方法。
 16. 评估：language model 中不断演进的评估（及 prompting）角色。
-17. 产品、用户体验与特性：随着主要 AI 实验室将 RLHF 用于微妙地将模型与产品匹配，RLHF 在适用性方面的演变。
+17. 塑造模型特性与产品：随着主要 AI 实验室将 RLHF 用于微妙地将模型与产品匹配，RLHF 在适用性方面的演变。
 
 #### 附录
 
 定义与扩展讨论的参考材料。
 
 - 附录 A - 定义：本书中所用 RL、语言建模及其他机器学习技术的数学定义。
-- 附录 B - 风格与信息：RLHF 在提升模型用户体验方面的作用往往被低估，这源于风格在信息传达中所扮演的关键角色。
+- 附录 B - 超越"仅仅是风格"：RLHF 在提升模型用户体验方面的作用往往被低估，这源于风格在信息传达中所扮演的关键角色。
 
 
 ### 目标读者
@@ -331,13 +354,13 @@ Post-training 目前的主要创新领域集中在 reinforcement learning with v
 本书的贡献旨在为你提供尝试玩具实现或深入文献所需的最少知识。
 这*不是*一本全面的教科书，而是一本用于快速回顾和入门的简明读本。
 
-本书于 2026 年 4 月定稿，正在进入印刷生产阶段。作为一本以网络为首的书籍，其内容将持续演进，如果你发现了错别字或重要的遗漏，欢迎在 [GitHub](https://github.com/natolambert/rlhf-book) 上贡献修正或建议。
+本书的印刷版由 Manning 于 2026 年 7 月出版，而网络版仍在持续收录小幅改进和勘误修正。如果你发现了错别字或重要的遗漏，欢迎在 [GitHub](https://github.com/natolambert/rlhf-book) 上贡献修正或建议。
 
 ### 关于作者
 
 Nathan Lambert 博士是一位研究人员和作家，专注于构建 language model 的开放科学。他通过机器人学博士学位来到这一领域，并在 ChatGPT 发布后不久组建了一支 RLHF 团队。
-他在 Allen Institute for AI（Ai2）和 HuggingFace 任职期间，发布了许多用 RLHF 训练的模型、相应的 dataset 以及训练代码库。
-代表性成果包括 [Zephyr-Beta](https://huggingface.co/HuggingFaceH4/zephyr-7b-beta)、[Tulu 2](https://huggingface.co/allenai/tulu-2-dpo-70b)、[OLMo](https://huggingface.co/allenai/OLMo-7B-Instruct)、[TRL](https://github.com/huggingface/trl)、[Open Instruct](https://github.com/allenai/open-instruct) 等众多项目。
+他在 Allen Institute for AI（Ai2）和 Hugging Face 任职期间，发布了许多用 RLHF 训练的模型、相应的 dataset 以及训练代码库。
+代表性成果包括 [Zephyr-Beta](https://huggingface.co/HuggingFaceH4/zephyr-7b-beta)、[Tülu 2](https://huggingface.co/allenai/tulu-2-dpo-70b)、[OLMo](https://huggingface.co/allenai/OLMo-7B-Instruct)、[TRL](https://github.com/huggingface/trl)、[Open Instruct](https://github.com/allenai/open-instruct) 等众多项目。
 他在 RLHF 领域著述颇丰，包括[众多博客文章](https://www.interconnects.ai/t/rlhf)和[学术论文](https://scholar.google.com/citations?hl=en&user=O4jW7BsAAAAJ&view_op=list_works&sortby=pubdate)。
 
 ## RLHF 的未来

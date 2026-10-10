@@ -241,7 +241,7 @@ CN_CHAPTER_HTMLS = $(patsubst book/chapters/cn/%.md,$(NESTED_CN_HTML_DIR)/%.html
 
 # CN templates are derived from the upstream English ones (relative links,
 # translated labels) so upstream template changes flow through automatically.
-$(CN_TEMPLATE_STAMP): book/scripts/make_cn_templates.py book/templates/chapter.html book/templates/footer.html book/templates/nav.js
+$(CN_TEMPLATE_STAMP): book/scripts/make_cn_templates.py book/templates/chapter.html book/templates/footer.html book/templates/nav.js book/templates/style.css
 	uv run python book/scripts/make_cn_templates.py $(CN_TEMPLATE_DIR)
 	@touch $@
 

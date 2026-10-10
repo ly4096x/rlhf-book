@@ -1,4 +1,4 @@
-<!-- source-commit: 02c6d49 -->
+<!-- source-commit: eecc49e -->
 <!--
   Copyright (c) 2025-2026 Nathan Lambert.
   Licensed under CC BY-NC-SA 4.0:
@@ -10,18 +10,26 @@ prev-chapter: "过度优化"
 prev-url: "14-over-optimization"
 page-title: Regularization
 search-title: "第15章：Regularization"
+meta-description: "用于在 RLHF 和 post-training 更新中保持模型有用、同时不损害基础模型的 regularization 方法。"
 next-chapter: "评估"
 next-url: "16-evaluation"
+lectures:
+  - video: "https://www.youtube.com/watch?v=IwpYxANrpUs&list=PLL1tdVxB1CpVpEtMHxwuR4uI4Lxjw00_y&index=15"
+    label: "第十讲：RL 中的 Regularization、为什么 RL 能泛化，以及为什么 SFT 会遗忘"
 ---
 
 # Regularization
 
+在本书中，我们已经学习了许多让模型从人类偏好、可验证奖励和其他有价值信号中学习的工具。
+我们使用的所有方法都非常强大，也可能导致模型相对于上一训练阶段中强大而通用的模型（通常称为参考模型）发生过大的变化。
+当模型从某个 reward 中学到过多，导致分布外性能下降时，这被称为"过度优化"（正如我们在上一章讨论的那样）。
+
 在整个 RLHF 优化过程中，会使用许多 regularization 步骤来防止对 reward model 的过度优化。
 在这些情境中，过度优化的表现是模型输出无意义的文本。
-优化"失控"的一些例子包括：模型输出逻辑上可跟随的数学推理，但答案极度错误；文本重复；语言切换；或大量特殊字符。
+优化"失控"的一些例子是模型输出逻辑上可跟随的数学推理，但答案极度错误；文本重复；语言切换；或大量特殊字符。
 本章介绍用于控制模型优化的各种方法。
 
-目前最流行的变体（在撰写本文时已被大多数 RLHF 实现所采用）是当前 policy 与参考 policy 在生成样本上的 KL distance。
+目前最流行的变体（截至 2026 年已被大多数 RLHF 实现所采用）是当前 policy 与参考 policy 在生成样本上的 KL distance。
 "KL distance"是一个口语化术语，用于表达训练过程中的*优化距离*，尽管 KL divergence——衡量两个概率分布差异的底层数学方法——并不满足成为真正距离度量所需的形式化属性（相比于"两个分布之间的数值差异度量"，将其称为距离更为简便）。
 许多其他 regularization 技术在文献中出现后，又在该研究系列的下一个模型迭代中消失。
 也就是说，核心 KL distance（基于生成样本）之外的 regularization 通常用于稳定实验设置，而这些设置在下一代模型中往往可以被简化。
@@ -63,37 +71,33 @@ KL penalty 最常见的实现方式是将训练期间生成的 token 与静态�
 ### 实现示例
 
 在实践中，KL divergence 的实现通常采用近似方法 [@schulman2016klapprox]，从而使实现大为简化。
-根据上述定义，当直接从分布 $P(x)$ 采样时，KL 的求和可以转化为期望。
-在这种情况下，分布 $P(x)$ 是当前正在训练的模型（而非参考模型）的生成分布。
+根据上述定义，当直接从分布 $P$ 采样时（这里 $x$ 是样本空间上的一般随机变量，与本书其他地方使用的 prompt 记号不同），KL 的求和可以转化为期望。
+在这种情况下，$P$ 是当前正在训练的模型（而非参考模型）的生成分布。
 这样，KL divergence 的计算变为：
 
 $$
 \mathcal{D}_{\text{KL}}(P \,||\, Q) = \mathbb{E}_{x \sim P} \left[ \log P(x) - \log Q(x) \right].
 $$ {#eq:kl_expectation}
 
-这种方式实现起来更为简单，特别是在直接处理语言模型训练中频繁使用的对数概率时。
+这种基于采样的形式实现起来更为简单，特别是在直接处理语言模型训练中频繁使用的对数概率时。
 
 ```python
-# 第1步：从你的 policy 中采样（或以其他方式生成）一个序列
+# 第1步：generate() 逐 token 自回归地采样出一个完整序列
 generated_tokens = model.generate(inputs)
 
-# 第2步：在两个模型下对生成的序列进行打分
-#    对于自回归语言模型，通常做法是：
-#      inputs_for_scoring = generated_tokens[:, :-1]
-#      labels           = generated_tokens[:, 1:]
+# 第2步：forward() 对序列做一次前向传播以得到每个 token 的 logits（不进行采样）
 logits       = model.forward(generated_tokens[:, :-1]).logits
 ref_logits   = ref_model.forward(generated_tokens[:, :-1]).logits
 
-# 转换为对数概率，然后对齐标签以索引到 logits 中
+# 第3步：将 logits 转换为对数概率
 logprobs     = F.log_softmax(logits, dim=-1)
 ref_logprobs = F.log_softmax(ref_logits, dim=-1)
 
-# 收集实际下一个 token 的对数概率
+# 第4步：收集每个模型赋予实际生成 token 的概率
 token_logprobs     = logprobs.gather(-1, generated_tokens[:, 1:].unsqueeze(-1)).squeeze(-1)
 ref_token_logprobs = ref_logprobs.gather(-1, generated_tokens[:, 1:].unsqueeze(-1)).squeeze(-1)
 
-# 现在可以对这些值求和（或取平均）以得到序列对数概率，
-# 并计算 KL：
+# 第5步：求和得到序列级对数概率；二者之差近似 KL
 seq_logprob     = token_logprobs.sum(dim=-1)
 ref_seq_logprob = ref_token_logprobs.sum(dim=-1)
 
@@ -101,8 +105,63 @@ kl_approx = seq_logprob - ref_seq_logprob
 kl_full   = F.kl_div(ref_logprobs, logprobs, reduction='batchmean')
 ```
 
-一些示例实现包括 [TRL](https://github.com/huggingface/trl/blob/5c21de30ae210e4251ead85517ba8dfe3f210e81/trl/trainer/ppo_trainer.py#L1150) 和 [Hamish Ivison 的 Jax 代码](https://github.com/hamishivi/EasyLM/blob/main/EasyLM/models/llama/llama_train_ppo.py#L278)。
+一些示例实现包括 [TRL](https://github.com/huggingface/trl/blob/5c21de30ae210e4251ead85517ba8dfe3f210e81/trl/trainer/ppo_trainer.py#L1150) 和 [Hamish Ivison 的 JAX 代码](https://github.com/hamishivi/EasyLM/blob/main/EasyLM/models/llama/llama_train_ppo.py#L278)。
 
+
+## 控制优化的其他工具
+
+在 post-training 文献中，许多顶尖模型都加入了其他 regularization 方法，以在各自的设置中达到领先性能。
+列出这些例子是为了展示一些领先模型如何调整 post-training 设置以获得稳定的优化过程，而非作为在所有设置中都必然奏效的通用工具。
+还有无数更具创意的解决方案有效且将被发现！
+
+### RL 中的 Pretraining Gradients
+
+另一种看待 regularization 的方式是：你可能有一个*数据集*，希望模型保持接近该数据集，正如 InstructGPT [@ouyang2022training] 中所做的那样，"以修复在公开 NLP 数据集上的性能退化"。
+为了实现这一点，他们修改了 RLHF 的训练目标。
+以 @eq:rl_start 为基础，我们可以将其转化为一个优化目标函数：从 RL policy 模型中采样，从用于 RLHF 的 RL 数据集中对 prompt $x$ 生成补全 $y$，得到：
+$$
+J(\theta) = \mathbb{E}_{(x,y) \sim \mathcal{D}_{\pi_{\text{RL},\theta}}} \left[ r_{\theta}(y \mid x) - \lambda r_{\text{reg.}} \right]
+$$ {#eq:objective_regularization}
+
+随后，我们可以为标准自回归下一个 token 预测损失（即 pretraining 时所用的损失）添加一个额外奖励，其数据来自预训练语料库（或其他数据集）中采样的文档，以维持文本连贯性：
+
+$$
+J(\theta) = \mathbb{E}_{(x,y) \sim \mathcal{D}_{\pi_{\text{RL},\theta}}} \left[ r_{\theta}(y \mid x) - \lambda r_{\text{reg.}} \right] + \gamma \mathbb{E}_{x \sim \mathcal{D}_{\text{pretrain}}} \left[ \log(\pi_{\text{RL},\theta}(x)) \right]
+$$ {#eq:objective_pretraining}
+
+### DPO 中的 Next-token Accuracy
+
+近期研究提出使用负对数似然（negative log-likelihood）项来平衡 Direct Preference Optimization（DPO）的优化 [@pang2024iterative]。
+鉴于 DPO 损失的成对性质，同样的损失修改方式也可应用于 reward model 训练，约束模型预测准确的文本。
+
+优化过程是对 DPO 的修改：
+$$\mathcal{L}_{\text{DPO+NLL}} = \mathcal{L}_{\text{DPO}}(c_i^w, y_i^w, c_i^l, y_i^l \mid x_i) + \alpha \mathcal{L}_{\text{NLL}}(c_i^w, y_i^w \mid x_i)
+$$ {#eq:dpo_nll}
+
+$$
+= -\log \sigma \left( \beta \log \frac{P_\theta(c_i^w, y_i^w \mid x_i)}{P_{\text{ref.}}(c_i^w, y_i^w \mid x_i)} - \beta \log \frac{P_\theta(c_i^l, y_i^l \mid x_i)}{P_{\text{ref.}}(c_i^l, y_i^l \mid x_i)} \right) - \alpha \frac{\log P_\theta(c_i^w, y_i^w \mid x_i)}{|c_i^w| + |y_i^w|},
+$$ {#eq:dpo_nll_expanded}
+
+其中 $P_{\theta}$ 为可训练的 policy 模型，$P_{\text{ref.}}$ 为固定的参考模型（通常为 SFT 的 checkpoint），$(c_i^w, y_i^w)$ 和 $(c_i^l, y_i^l)$ 分别表示 prompt $x_i$ 对应的优胜补全与落败补全。
+第一项是标准 DPO logistic 损失：通过对数似然比之差 $\log \tfrac{P_{\theta}}{P_{\text{ref.}}}$ 增大优胜与落败之间的差距，$\beta$ 控制该偏好信号偏离参考模型的强度。
+第二项是对优胜补全施加的长度归一化负对数似然惩罚，权重为 $\alpha$，其作用是在绝对语言建模意义上保持优选文本的高似然性，而不仅仅是相对于被拒绝样本更优。
+
+### Reward Modeling 中的 Margin-Based Regularization
+
+在 RLHF 体系的其他部分，对优化的控制定义得没那么清晰。
+大多数 reward model 除了标准对比损失函数之外没有额外的 regularization。
+Direct Alignment Algorithms 通过 $\beta$ 参数以不同方式处理对 KL divergence 的 regularization（参见 [direct alignment 章节](https://rlhfbook.com/c/08-direct-alignment)）。
+
+Llama 2 为 reward model 训练提出了一种 margin 损失 [@touvron2023llama]：
+
+$$
+\mathcal{L}(\theta) = - \log \left( \sigma \left( r_{\theta}(y_c \mid x) - r_{\theta}(y_r \mid x) - m(y_c, y_r) \right) \right)
+$$ {#eq:margin_loss}
+
+其中 $m(y_c, y_r)$ 是两个数据点 $y_c$ 和 $y_r$ 之间的 margin，代表两位标注者评分之差的数值。
+这可以通过让标注者对输出进行数值评分，或使用量化排名方法（如 [Likert 量表](https://en.wikipedia.org/wiki/Likert_scale)）来实现。
+
+Reward margins 在 direct alignment 文献中被大量使用，例如 Reward-weighted DPO；Reward-aware Preference Optimization（RPO），它在 DPO 损失之后将 reward model 分数整合进更新规则 [@adler2024nemotron]；以及 REBEL [@gao2024rebel]，它在回归损失形式中采用了 reward 差值加权。
 
 ## 隐式 Regularization
 
@@ -124,7 +183,7 @@ Chu 等人 2025 [@chu2025sft] 通过一项受控实证研究回答了这一问�
 - **V-IRL** 是一个真实世界的视觉导航任务，模型需要遵循语言指令在城市街道中沿路线行进，并识别沿途的地标。OOD 迁移将动作空间从绝对方向（北、东）切换为相对方向（左、右）。
 
 在所有任务变体中，随着训练计算量的增大，RL 始终提升 OOD 性能，而 SFT 尽管在分布内表现有所改善，OOD 性能却始终*下降*。
-差异幅度令人瞩目：在仅用语言输入的 V-IRL 任务上，OOD 迁移是从绝对方向坐标到相对方向坐标，RL 将 OOD 逐步准确率从 80.8% 提升至 91.8%，而 SFT 则从 80.8% 崩溃至 1.3%。
+差异幅度令人瞩目：在仅用语言输入的 V-IRL 任务上，OOD 迁移是从绝对方向坐标到相对方向坐标，RL 将 OOD 逐步准确率从 80.8% 提升至 91.8%，而 SFT 将其从 80.8% 崩溃至 1.3%。
 SFT 模型不仅未能泛化，还破坏了基础模型原本具备的空间推理能力，退化为从指令短语到绝对方向的查找表。
 
 ### 在实践中保留：on-policy 数据缓解遗忘
@@ -138,8 +197,8 @@ Chen 等人 2025 [@chen2025retainingdoingroleonpolicy] 提出了互补性问题�
 
 KL divergence 定义为两个分布之间对数比的期望，$\mathbb{E}_{x \sim P}\!\left[\log \frac{P(x)}{Q(x)}\right]$，可以写成对数差的形式，分为两个方向：
 
-- **Forward KL**：$\text{KL}(P \| Q) = \mathbb{E}_{x \sim P}[\log P(x) - \log Q(x)]$
-- **Reverse KL**：$\text{KL}(Q \| P) = \mathbb{E}_{x \sim Q}[\log Q(x) - \log P(x)]$
+- **Forward KL**：$\text{KL}(P \| Q) = \mathbb{E}_{x \sim P}\!\left[\log P(x) - \log Q(x)\right]$
+- **Reverse KL**：$\text{KL}(Q \| P) = \mathbb{E}_{x \sim Q}\!\left[\log Q(x) - \log P(x)\right]$
 
 其中 $P$ 是目标分布，$Q$ 是我们用参数 $\theta$ 建模的分布。
 关键区别在于我们从哪个分布中采样：forward KL 从目标（或最优）分布 $P$ 中采样，而 reverse KL 从我们的 policy $Q$ 中采样。
@@ -147,7 +206,9 @@ KL divergence 定义为两个分布之间对数比的期望，$\mathbb{E}_{x \si
 SFT 将目标放在前面——$\text{KL}(\pi_\star \| \pi_\theta)$——而 RL 则颠倒顺序——$\text{KL}(\pi_\theta \| \pi_\star)$——从而改变了我们从哪个分布中采样。
 样本提供了学习所需的数据。目标函数，SFT 或 RL，从这些数据中塑造模型。
 
-**SFT $\approx$ Forward KL。** 从 forward KL 的定义出发：
+#### SFT Forward KL
+
+从 forward KL 的定义出发：
 
 $$
 \text{KL}(\pi_\star \| \pi_\theta) = \mathbb{E}_{(x,y) \sim \mathcal{D}} \left[ \log \pi_\star(y \mid x) - \log \pi_\theta(y \mid x) \right]
@@ -159,8 +220,8 @@ $$
 = \mathbb{E}_{(x,y) \sim \mathcal{D}} \left[ \log \pi_\star(y \mid x) \right] - \mathbb{E}_{(x,y) \sim \mathcal{D}} \left[ \log \pi_\theta(y \mid x) \right]
 $$
 
-第一项 $\mathbb{E}[\log \pi_\star(y \mid x)]$ 仅依赖于数据分布，等于负熵 $-H(\pi_\star)$——一个不随 $\theta$ 变化的常数。
-第二项 $-\mathbb{E}[\log \pi_\theta(y \mid x)]$ 是数据集上的负对数似然，即标准的 SFT 交叉熵损失 $\mathcal{L}_\text{SFT}(\theta)$。代入后：
+第一项 $\mathbb{E}\!\left[\log \pi_\star(y \mid x)\right]$ 仅依赖于数据分布，等于负熵 $-H(\pi_\star)$——一个不随 $\theta$ 变化的常数。
+第二项 $-\mathbb{E}\!\left[\log \pi_\theta(y \mid x)\right]$ 是数据集上的负对数似然，即标准的 SFT 交叉熵损失 $\mathcal{L}_\text{SFT}(\theta)$。代入后：
 
 $$
 = \underbrace{-H(\pi_\star)}_\text{const} + \mathcal{L}_\text{SFT}(\theta) \propto \mathcal{L}_\text{SFT}(\theta)
@@ -168,7 +229,9 @@ $$ {#eq:sft_forward_kl}
 
 由于熵项相对于 $\theta$ 是常数，两个损失函数具有相同的梯度和相同的最小值——最小化 SFT 损失等价于最小化 **forward KL** divergence $\text{KL}(\pi_\star \| \pi_\theta)$。
 
-**RL $\approx$ Reverse KL。** 从标准的 KL regularization RL 目标出发：
+#### RL Reverse KL
+
+从标准的 KL regularization RL 目标出发：
 
 $$
 \max_\pi \; \mathcal{J}_\text{RL}(\theta) = \mathbb{E}_{x \sim \mathcal{D},\, y \sim \pi(\cdot \mid x)} \left[ r(x, y) \right] - \beta \cdot \text{KL}\!\left(\pi(\cdot \mid x) \| \pi_\text{ref}(\cdot \mid x)\right)
@@ -263,54 +326,3 @@ $$ {#eq:rl_razor_forgetting}
 
 直觉上，on-policy 方法采样的是模型本身已赋予非可忽略概率的输出，因此每次更新都被约束在接近当前分布的范围内。
 相比之下，SFT 训练于一个固定的外部分布，该分布可能与模型当前产出的内容相距甚远，而每一个梯度步骤都会朝着那个遥远的目标靠拢，无论模型自身的倾向如何。
-
-## 其他类型的 Regularization
-
-在 post-training 文献中，许多顶尖模型都加入了其他 regularization 方法，以在各自的设置中达到领先性能。
-以下两个例子旨在展示一些领先模型如何调整 post-training 设置以获得稳定的优化过程，而非作为在所有设置中都必然奏效的通用工具。
-还有无数更具创意的解决方案有效且将被发现！
-
-### Pretraining Gradients
-
-另一种看待 regularization 的方式是：你可能有一个*数据集*，希望模型保持接近该数据集，正如 InstructGPT [@ouyang2022training] 中所做的那样，"以修复在公开 NLP 数据集上的性能退化"。
-为了实现这一点，他们修改了 RLHF 的训练目标。
-以 @eq:rl_start 为基础，我们可以将其转化为一个优化目标函数：从 RL policy 模型中采样，从用于 RLHF 的 RL 数据集中对 prompt $x$ 生成补全 $y$，得到：
-$$
-J(\theta) = \mathbb{E}_{(x,y) \sim \mathcal{D}_{\pi_{\text{RL},\theta}}} \left[ r_{\theta}(y \mid x) - \lambda r_{\text{reg.}} \right]
-$$ {#eq:objective_regularization}
-
-随后，我们可以为标准自回归下一个 token 预测损失（即 pretraining 时所用的损失）添加一个额外奖励，其数据来自预训练语料库（或其他数据集）中采样的文档，以维持文本连贯性：
-
-$$
-J(\theta) = \mathbb{E}_{(x,y) \sim \mathcal{D}_{\pi_{\text{RL},\theta}}} \left[ r_{\theta}(y \mid x) - \lambda r_{\text{reg.}} \right] + \gamma \mathbb{E}_{x \sim \mathcal{D}_{\text{pretrain}}} \left[ \log(\pi_{\text{RL},\theta}(x)) \right]
-$$ {#eq:objective_pretraining}
-
-近期研究提出使用负对数似然（negative log-likelihood）项来平衡 Direct Preference Optimization（DPO）的优化 [@pang2024iterative]。
-鉴于 DPO 损失的成对性质，同样的损失修改方式也可应用于 reward model 训练，约束模型预测准确的文本（这一做法来自未发表论文的实验室传言）。
-
-优化过程是对 DPO 的修改：
-$$\mathcal{L}_{\text{DPO+NLL}} = \mathcal{L}_{\text{DPO}}(c_i^w, y_i^w, c_i^l, y_i^l \mid x_i) + \alpha \mathcal{L}_{\text{NLL}}(c_i^w, y_i^w \mid x_i)
-$$ {#eq:dpo_nll}
-
-$$
-= -\log \sigma \left( \beta \log \frac{P_\theta(c_i^w, y_i^w \mid x_i)}{P_{\text{ref.}}(c_i^w, y_i^w \mid x_i)} - \beta \log \frac{P_\theta(c_i^l, y_i^l \mid x_i)}{P_{\text{ref.}}(c_i^l, y_i^l \mid x_i)} \right) - \alpha \frac{\log P_\theta(c_i^w, y_i^w \mid x_i)}{|c_i^w| + |y_i^w|},
-$$ {#eq:dpo_nll_expanded}
-
-其中 $P_{\theta}$ 为可训练的 policy 模型，$P_{\text{ref.}}$ 为固定的参考模型（通常为 SFT 的 checkpoint），$(c_i^w, y_i^w)$ 和 $(c_i^l, y_i^l)$ 分别表示 prompt $x_i$ 对应的优胜补全与落败补全。
-第一项是标准 DPO logistic 损失：通过对数似然比之差 $\log \tfrac{P_{\theta}}{P_{\text{ref.}}}$ 增大优胜与落败之间的差距，$\beta$ 控制该偏好信号偏离参考模型的强度。
-第二项是对优胜补全施加的长度归一化负对数似然惩罚，权重为 $\alpha$，其作用是在绝对语言建模意义上保持优选文本的高似然性，而不仅仅是相对于被拒绝样本更优。
-
-### Margin-based Regularization
-
-在 RLHF 体系的其他部分，对优化的控制定义得没那么清晰。
-大多数 reward model 除了标准对比损失函数之外没有额外的 regularization。
-Direct Alignment Algorithms 通过 $\beta$ 参数以不同方式处理对 KL divergence 的 regularization（参见 [direct alignment 章节](https://rlhfbook.com/c/08-direct-alignment)）。
-
-Llama 2 为 reward model 训练提出了一种 margin 损失 [@touvron2023llama]：
-
-$$
-\mathcal{L}(\theta) = - \log \left( \sigma \left( r_{\theta}(y_c \mid x) - r_{\theta}(y_r \mid x) - m(y_c, y_r) \right) \right)
-$$ {#eq:margin_loss}
-
-其中 $m(y_c, y_r)$ 是两个数据点 $y_c$ 和 $y_r$ 之间的 margin，代表两位标注者评分之差的数值。
-这可以通过让标注者对输出进行数值评分，或使用量化排名方法（如 [Likert 量表](https://en.wikipedia.org/wiki/Likert_scale)）来实现。

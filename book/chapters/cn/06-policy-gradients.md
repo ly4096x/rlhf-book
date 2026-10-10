@@ -1,4 +1,4 @@
-<!-- source-commit: 02c6d49 -->
+<!-- source-commit: eecc49e -->
 <!--
   Copyright (c) 2025-2026 Nathan Lambert.
   Licensed under CC BY-NC-SA 4.0:
@@ -6,32 +6,40 @@
   Full license: https://github.com/natolambert/rlhf-book/blob/main/LICENSE-CHAPTERS
 -->
 ---
-prev-chapter: "奖励模型"
+prev-chapter: "奖励建模"
 prev-url: "05-reward-models"
 page-title: 强化学习
 search-title: "第6章：强化学习"
-next-chapter: "推理"
+meta-description: "用于 RLHF 和 LLM post-training 的 policy gradient 方法，包括 PPO、REINFORCE、RLOO、GRPO 及实现细节。"
+next-chapter: "推理与推理时扩展"
 next-url: "07-reasoning"
+lectures:
+  - video: "https://www.youtube.com/watch?v=K_Sj_-1BUMM&list=PLL1tdVxB1CpVpEtMHxwuR4uI4Lxjw00_y&index=4"
+    label: "第三讲：理解面向 LLM 上 RL 的 Policy Gradient 算法"
+  - video: "https://www.youtube.com/watch?v=i-AIMpZHgeg&list=PLL1tdVxB1CpVpEtMHxwuR4uI4Lxjw00_y&index=5"
+    label: "第四讲：为 LLM 实现 RL 算法"
 ---
 
-# 强化学习（即 policy gradient 算法）
+# 强化学习
 
 在 RLHF 过程中，强化学习算法根据 reward model 的反馈，逐步更新模型的权重。
 policy——即被训练的模型——对训练集中的 prompt 生成补全内容，然后 reward model 对其评分，强化学习优化器根据这些信息执行梯度步骤（概览参见 @fig:rlhf-overview）。
 本章介绍各种算法的数学原理与权衡，这些算法用于从 reward model 对 on-policy 数据所给出的信号中学习。
 这些算法会运行多个 epoch，通常是在更大规模的 prompt 集合上运行数千乃至数百万个 batch，每个 batch 之间执行梯度更新。
 
+## RL 在 RLHF 中的作用
+
 让 RLHF 在语言模型中得以普及的，是 policy-gradient 强化学习算法。
 这些算法，如 Proximal Policy Optimization（PPO）、Group Relative Policy Optimization（GRPO）和 REINFORCE，使用最近生成的样本来更新模型（而非像 Deep Q-Networks、DQN 这类算法那样将评分存储在 replay buffer 中，DQN 被用于 AlphaGo 等知名项目）。
 本节将介绍 policy gradient 算法的基础知识，以及它们在现代 RLHF 框架中的应用方式。
 
 从机器学习层面来看，本节是 RLHF 过程中复杂度最高的部分。
-不过，与大多数现代 AI 模型一样，决定其成功的最大因素是作为输入提供给该过程的数据。
+然而，与大多数现代 AI 模型一样，决定其成功的最大因素是作为输入提供给该过程的数据。
 
 ![RLHF 训练循环概览。数据集中的 prompt 被传入调优后的 policy，由其生成补全内容。reward model 对该补全内容评分，而冻结的初始模型（通常是 RL 之前的 instruction-tuned 模型）则对相同文本计算对数概率，以计算防止过度偏移的 KL penalty。综合后的 reward 信号随后驱动对 policy 参数的强化学习更新。](images/rlhf-overview.png){#fig:rlhf-overview}
 
 当 RLHF 随 ChatGPT 进入公众视野时，业界普遍知晓 OpenAI 使用了 PPO 的一个变体，许多早期工作也以此为基础。
-随着时间推移，多个研究项目展示了 REINFORCE 风格算法的潜力 [@ahmadian2024back] [@wang2024helpsteer2p]，其优点在于相比 PPO 更为简洁——无需 reward model（节省内存，进而减少所需 GPU 数量），且 value 估计更简单（无需 Generalized Advantage Estimation，GAE，这是一种用于在 policy gradient 算法中减少方差的 advantage 计算方法）。
+随着时间推移，多个研究项目展示了 REINFORCE 风格算法的潜力 [@ahmadian2024back] [@wang2024helpsteer2p]，其优点在于相比 PPO 更为简洁——无需单独的 value model（节省内存，进而减少所需 GPU 数量），且 advantage 估计更简单（无需 Generalized Advantage Estimation，GAE，这是一种用于在 policy gradient 算法中减少方差的 advantage 计算方法）。
 更多算法相继涌现，其中 Group Relative Policy Optimization 在推理任务中尤为流行，但总体而言，这些算法大多可以调整以适应特定任务。
 本章涵盖核心 policy gradient 框架，以及上述三种算法，因为它们在建立规范化 RLHF 文献中发挥了核心作用。
 
@@ -65,29 +73,31 @@ policy gradient 计算的是哪些参数对某一动作有所贡献，以及我�
 
 现在，让我们进一步将其形式化。
 强化学习算法旨在最大化跨状态 $s \in \mathcal{S}$ 和动作 $a \in \mathcal{A}$ 的 trajectory 上的未来折扣奖励（更多符号说明请参见附录 A，定义）。
-智能体的目标，通常称为 *return*，是在给定时刻 $t$ 的未来折扣奖励之和（其中 $\gamma\in [0,1]$ 是优先考虑近期奖励的折扣因子）：
+智能体的目标，通常称为 *return*，是从给定时刻 $t$ 开始的折扣奖励之和（其中 $\gamma\in [0,1]$ 是优先考虑近期奖励的折扣因子）：
 
-$$G_t = R_{t+1} + \gamma R_{t+2} + \cdots = \sum_{k=0}^\infty \gamma^k R_{t+k+1}.$$ {#eq:return_definition}
+$$G_t = r_t + \gamma r_{t+1} + \cdots = \sum_{k=0}^\infty \gamma^k r_{t+k}.$$ {#eq:return_definition}
 
-return 的定义也可以递归估计为：
-$$G_{t} = \gamma{G_{t+1}} + R_{t+1}.$$ {#eq:recursive_return}
+return 的定义也可以写成递归形式：
+$$G_{t} = r_t + \gamma G_{t+1}.$$ {#eq:recursive_return}
 
 该 return 是学习 value function $V(s)$ 的基础，$V(s)$ 表示给定当前状态下对未来 return 的估计：
 
-$$V(s) = \mathbb{E}\big[G_t | S_t = s \big].$$ {#eq:value_function}
+$$V(s) = \mathbb{E}\left[G_t \mid S_t = s \right].$$ {#eq:value_function}
 
 所有 policy gradient 算法都通过优化 policy $\pi_\theta(a\mid s)$ 来最大化期望 return；该目标可以使用由 policy 导出的 value function $V^{\pi_\theta}(s)$ 来表达。
 
-其中 $d^{\pi_\theta}(s)$ 是由 policy $\pi_\theta(a \mid s)$ 导出的状态访问分布，我们最大化的目标可以写为：
+设 $d_0(s)$ 为初始状态分布。我们最大化的 episodic 目标可以写为：
 $$
 J(\theta)
 \;=\;
-\sum_{s} d^{\pi_\theta}(s) V^{\pi_\theta}(s),
+\sum_{s} d_0(s) V^{\pi_\theta}(s),
 $$ {#eq:policy_objective}
 
-在有限 MDP 中，这是对所有状态的求和，但在实践中我们从不精确计算它。
+在有限 MDP 中，这是对所有可能起始状态的求和，但在实践中我们从不精确计算它。
 相反，我们通过从当前 policy 中采样 rollout 来从数据中估计它。
-在 RLHF 中，这通常意味着从数据集中采样 prompt $x_i$，并生成补全内容 $y_i \sim \pi_\theta(\cdot\mid x_i)$，然后计算经验均值，例如：
+在 RLHF 中，这通常意味着从数据集中采样 prompt $x_i$，并生成补全内容 $y_i \sim \pi_\theta(\cdot\mid x_i)$。
+设 $R(x_i, y_i)$ 表示分配给该 prompt-补全对的标量序列级 reward；若 $\tau_i$ 是对应的 episode，则它就是 trajectory reward $R(\tau_i)$。
+然后我们计算经验均值，例如：
 
 $$
 \hat{J}(\theta) = \frac{1}{B}\sum_{i=1}^{B} R(x_i, y_i),
@@ -110,18 +120,19 @@ $$\theta \leftarrow \theta + \alpha \nabla_\theta J(\theta)$$ {#eq:policy_update
 
 ### 推导 Policy Gradient
 
+设 $p_\theta(\tau)$ 表示由初始状态分布 $d_0$、policy $\pi_\theta$ 和环境转移动态共同导出的 trajectory 分布，其展开形式见下文 @eq:trajectory_probability。
 另一种表述我们希望最大化的 RL 目标的方式如下：
 $$
-J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta} \left[ R(\tau) \right],
+J(\theta) = \mathbb{E}_{\tau \sim p_\theta} \left[ R(\tau) \right],
 $$ {#eq:policy_objective_expectation}
 
 其中 $\tau = (s_0, a_0, s_1, a_1, \ldots)$ 是一条 trajectory，$R(\tau) = \sum_{t=0}^\infty r_t$ 是该 trajectory 的总奖励。或者，我们可以将期望写成对所有可能 trajectory 的积分：
 $$
 J(\theta) = \int_\tau p_\theta (\tau) R(\tau) d\tau
 $$ {#eq:policy_objective_integral}
-注意，我们可以将 trajectory 概率表达如下，其中 $\pi_\theta(a_t|s_t) p(s_{t+1}|s_t, a_t)$ 是从某一状态和动作转移到一组下一状态的转移概率：
+注意，我们可以将 trajectory 概率表达如下，其中 $\pi_\theta(a_t|s_t) p(s_{t+1}|s_t, a_t)$ 将 policy 概率与环境从一个状态-动作对到下一状态的转移概率结合在一起：
 $$
-p_\theta (\tau) = p(s_0) \prod_{t=0}^\infty \pi_\theta(a_t|s_t) p(s_{t+1}|s_t, a_t),
+p_\theta (\tau) = d_0(s_0) \prod_{t=0}^\infty \pi_\theta(a_t|s_t) p(s_{t+1}|s_t, a_t),
 $$ {#eq:trajectory_probability}
 
 若我们对目标函数（@eq:policy_objective_expectation）关于 policy 参数 $\theta$ 求梯度：
@@ -141,23 +152,23 @@ $$ {#eq:log_chain_rule}
 $$
 \begin{aligned}
 \nabla_\theta J(\theta) &= \int_\tau \nabla_\theta p_\theta (\tau) R(\tau) d\tau \\
-&= \int_\tau p_\theta (\tau) \nabla_\theta \log p_\theta (\tau) R(\tau) d\tau \\
-&= \mathbb{E}_{\tau \sim \pi_\theta} \left[ \nabla_\theta \log p_\theta (\tau) R(\tau) \right]
+&= \int_\tau p_\theta (\tau) R(\tau) \nabla_\theta \log p_\theta (\tau) d\tau \\
+&= \mathbb{E}_{\tau \sim p_\theta} \left[ R(\tau) \nabla_\theta \log p_\theta (\tau) \right]
 \end{aligned}
 $$ {#eq:policy_gradient_expectation}
 
 最后一步使用了在 trajectory 分布 $p_\theta(\tau)$ 下期望的定义：对任意函数 $f$，$\mathbb{E}_{\tau \sim p_\theta}[f(\tau)] = \int_\tau f(\tau)\,p_\theta(\tau)\,d\tau$（离散情形下为求和）。
-将其写成期望的形式非常有用，因为我们可以用 Monte Carlo rollout 来近似，例如对 trajectory $\tau_i \sim \pi_\theta$，用 $\frac{1}{B}\sum_{i=1}^{B} f(\tau_i)$ 来近似。
+将其写成期望的形式非常有用，因为我们可以用 Monte Carlo rollout 来近似，例如对当前 policy 导出的 trajectory $\tau_i \sim p_\theta$，用 $\frac{1}{B}\sum_{i=1}^{B} f(\tau_i)$ 来近似。
 
 回到推导过程，展开 trajectory 的对数概率：
 
 $$
-\log p_\theta (\tau) = \log p(s_0) + \sum_{t=0}^\infty \log \pi_\theta(a_t|s_t) + \sum_{t=0}^\infty \log p(s_{t+1}|s_t, a_t)
+\log p_\theta (\tau) = \log d_0(s_0) + \sum_{t=0}^\infty \log \pi_\theta(a_t|s_t) + \sum_{t=0}^\infty \log p(s_{t+1}|s_t, a_t)
 $$ {#eq:trajectory_log_prob}
 
 现在，若对上式求梯度，可得：
 
-- $\nabla_\theta \log p(s_0) = 0$（初始状态不依赖于 $\theta$）
+- $\nabla_\theta \log d_0(s_0) = 0$（初始状态分布不依赖于 $\theta$）
 - $\nabla_\theta \log p(s_{t+1}|s_t, a_t) = 0$（环境的转移动态不依赖于 $\theta$）
 - 只有 $\nabla_\theta \log \pi_\theta(a_t|s_t)$ 保留下来
 
@@ -166,8 +177,8 @@ $$
 \nabla_\theta \log p_\theta (\tau) = \sum_{t=0}^\infty \nabla_\theta \log \pi_\theta(a_t|s_t)
 $$ {#eq:trajectory_log_grad}
 
-在此稍作说明，推导至此已触及实现上的关键一步。
-我们已经可以看出，trajectory 分布的梯度可以化简为语言模型 policy 概率的梯度之和（即被训练模型给出的 token 概率）。
+推导至此已触及实现上的关键一步。
+我们已经可以看出，trajectory 分布的梯度化简为语言模型 policy 概率的梯度之和（即被训练模型给出的 token 概率）。
 在实践中，这导出了 policy gradient 方程的一种常见形式：loss 中是对数概率之和，然后通过自动微分计算梯度。
 你会反复见到如下简短代码片段：
 
@@ -179,20 +190,20 @@ loss.backward()
 
 本章后续将多次用到这一形式。现在回到正式的 policy gradient 数学推导。
 
-将 @eq:trajectory_log_grad 代回 @eq:policy_gradient_expectation，得：
+将上式代回 @eq:policy_gradient_expectation，得：
 $$
-\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta} \left[ \sum_{t=0}^\infty \nabla_\theta \log \pi_\theta(a_t|s_t) R(\tau) \right]
+\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim p_\theta} \left[ \sum_{t=0}^\infty R(\tau) \nabla_\theta \log \pi_\theta(a_t|s_t) \right]
 $$ {#eq:policy_gradient_returns}
 
 通常人们会使用更一般化的 policy gradient 公式：
 $$
-g = \nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta} \left[ \sum_{t=0}^\infty \nabla_\theta \log \pi_\theta(a_t|s_t) \Psi_t \right]
+g = \nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim p_\theta} \left[ \sum_{t=0}^\infty \Psi_t \nabla_\theta \log \pi_\theta(a_t|s_t) \right]
 $$ {#eq:general_gradient}
 
 其中 $\Psi_t$ 可以是以下各项之一（reward 通常还可以用 $\gamma$ 折扣），这一分类框架沿用自 Schulman et al. 2015 [@schulman2015high]：
 
 1. $R(\tau) = \sum_{t=0}^{\infty} r_t$：trajectory 的总 reward。
-2. $\sum_{t'=t}^{\infty} r_{t'}$：执行动作 $a_t$ 之后的 reward，也称为 return $G$。
+2. $\sum_{t'=t}^{\infty} r_{t'}$：执行动作 $a_t$ 之后的 reward，也称为从时刻 $t$ 起的 return $G_t$。
 3. $\sum_{t'=t}^{\infty} r_{t'} - b(s_t)$：上一公式的带 baseline 版本。
 4. $Q^{\pi}(s_t, a_t)$：状态-动作 value function。
 5. $A^{\pi}(s_t, a_t)$：advantage function，若能精确计算，理论上方差最低。
@@ -201,8 +212,8 @@ $$ {#eq:general_gradient}
 *baseline* 是一个用于降低 policy 更新方差的值（详见下文）。
 
 对于语言模型而言，其中一些概念并不那么直观。
-例如，对于确定性 policy $\pi$，状态 value 为 $V^{\pi}(s_t) = Q^{\pi}(s_t, \pi(s_t))$（最优 value function 则满足 $V^*(s_t)=\max_{a_t} Q^*(s_t,a_t)$）；对于随机性 policy，对应的恒等式为 $V^{\pi}(s_t) = \mathbb{E}_{a_t \sim \pi(\cdot\mid s_t)}[Q^{\pi}(s_t,a_t)]$。
-Bellman 方程将 Q 与 V 联系起来：一般情况下 $Q^\pi(s_t,a_t) = \mathbb{E}[r_t + \gamma V^\pi(s_{t+1}) \mid s_t, a_t]$，但对于状态转移确定性的语言模型，这可以化简为 $Q(s_t,a_t) = r_t + \gamma V(s_{t+1})$。
+例如，对于确定性 policy $\pi$，状态 value 为 $V^{\pi}(s_t) = Q^{\pi}(s_t, \pi(s_t))$（最优 value function 则满足 $V^*(s_t)=\max_{a_t} Q^*(s_t,a_t)$）；对于随机性 policy，对应的恒等式为 $V^{\pi}(s_t) = \mathbb{E}_{a_t \sim \pi(\cdot\mid s_t)}\!\left[Q^{\pi}(s_t,a_t)\right]$。
+Bellman 方程将 Q 与 V 联系起来：一般情况下 $Q^\pi(s_t,a_t) = \mathbb{E}\!\left[r_t + \gamma V^\pi(s_{t+1}) \mid s_t, a_t\right]$，但对于状态转移确定性的语言模型，这可以化简为 $Q(s_t,a_t) = r_t + \gamma V(s_{t+1})$。
 advantage function 衡量动作 $a_t$ 相对于平均水平的优势程度：
 
 $$A(s_t,a_t) = Q(s_t,a_t) - V(s_t) = r_t + \gamma V(s_{t+1}) - V(s_t)$$ {#eq:advantage_trick}
@@ -212,21 +223,21 @@ $$A(s_t,a_t) = Q(s_t,a_t) - V(s_t) = r_t + \gamma V(s_{t+1}) - V(s_t)$$ {#eq:adv
 ### Vanilla Policy Gradient
 
 Vanilla policy gradient 的实现通过对 policy 参数求导来优化上述 $J(\theta)$ 表达式。
-一个针对总 return 的简单版本如下：
+一个针对时刻 $t$ return 的简单版本如下：
 
-$$\nabla_\theta J(\theta) = \mathbb{E}_\tau \left[ \sum_{t=0}^T \nabla_\theta \log \pi_\theta(a_t|s_t) R_t \right]$$ {#eq:vanilla_policy_gradient}
+$$\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim p_\theta} \left[ \sum_{t=0}^T G_t \nabla_\theta \log \pi_\theta(a_t|s_t) \right]$$ {#eq:vanilla_policy_gradient}
 
 vanilla policy gradient 算法的一个常见问题是梯度更新的高方差，可以通过多种方式加以缓解。
-高方差的来源在于：梯度更新是通过估计 return $G$ 得到的，而所用的 rollout 数量通常较少，且容易受到噪声影响（例如，从语言模型以 temperature $>0$ 进行采样时的随机性）。
+高方差的来源在于：梯度更新是通过估计 return $G$ 计算得到的，而所用的 rollout 数量通常较少，且容易受到噪声影响（例如，从语言模型以 temperature $>0$ 进行采样时的随机性）。
 在 reward 稀疏的场景下，return 估计的方差更大，因为更多样本的值为 0 或 1，而非紧密聚集在一起。
 为缓解这一问题，人们使用各种技术来归一化 value 估计，称为 *baseline*。
 baseline 以多种方式实现这一目标，实际上是相对于后续动作对状态 value 进行归一化（例如 advantage 就是 Q 值与 value 之差）。
 最简单的 baseline 是对一批 reward 取平均，或使用移动平均。
-即使是这些与动作无关的 baseline，也能在不改变期望梯度的前提下降低方差，因为对任意仅依赖状态的 $b(s)$，有 $\mathbb{E}_{a \sim \pi(a|s)}[b(s) \nabla_\theta \log \pi_\theta(a|s)] = 0$，从而显著改善学习信号。
+即使是这些与动作无关的 baseline，也能在不改变期望梯度的前提下降低方差，因为对任意仅依赖状态的 $b(s)$，有 $\mathbb{E}_{a \sim \pi(a|s)}\!\left[b(s) \nabla_\theta \log \pi_\theta(a|s)\right] = 0$，从而显著改善学习信号。
 
 本章讨论的许多 policy gradient 算法都建立在 advantage 形式的 policy gradient 之上：
 
-$$\nabla_\theta J(\theta) = \mathbb{E}_\tau \left[ \sum_{t=0}^T \nabla_\theta \log \pi_\theta(a_t|s_t) A^{\pi_\theta}(s_t, a_t) \right]$$ {#eq:advantage_policy_gradient}
+$$\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim p_\theta} \left[ \sum_{t=0}^T A^{\pi_\theta}(s_t, a_t) \nabla_\theta \log \pi_\theta(a_t|s_t) \right]$$ {#eq:advantage_policy_gradient}
 
 
 ### REINFORCE
@@ -240,7 +251,7 @@ REINFORCE 算法的名称很可能是一个反向首字母缩写词，但它所�
 
 1. 非负因子：这是学习率（步长），必须为正数，例如下文中的 $\alpha$。
 2. 偏移 Reinforcement：这是一个基线 $b$ 或其他用于提升稳定性的奖励归一化因子。
-3. 特征资格（Characteristic Eligibility）：这决定了学习如何按 token 进行归因。它可以是每个参数的一般值 $e$，但在现代方程中通常为 policy 的对数概率。
+3. 特征资格（Characteristic Eligibility）：这将标量奖励信号归因于产生该动作的参数。Williams 将这一资格项记为 $e$（并非指数函数）。在现代 policy-gradient 符号中，它对应于 $\nabla_\theta \log \pi_\theta(a_t \mid s_t)$。
 
 因此，其形式相当熟悉：
 
@@ -251,10 +262,10 @@ $$ \Delta_\theta = \alpha(r - b)e $$ {#eq:REINFORCE_BASIC}
 $$
 \nabla_{\theta}\,J(\theta)
 \;=\;
-\mathbb{E}_{\tau \sim \pi_{\theta}}\!\Big[
+\mathbb{E}_{\tau \sim p_{\theta}}\!\left[
     \sum_{t=0}^{T}
-    \nabla_{\theta} \log \pi_{\theta}(a_t \mid s_t)\,(G_t - b(s_t))
-\Big],
+    (G_t - b(s_t))\,\nabla_{\theta} \log \pi_{\theta}(a_t \mid s_t)
+\right],
 $$ {#eq:REINFORCE_with_baseline}
 
 其中，$G_t - b(s_t)$ 是 policy 在当前状态下的 *advantage*，因此我们可以用 advantage $A$ 重新表述 policy gradient，并在后续章节中沿用这一形式：
@@ -262,15 +273,15 @@ $$ {#eq:REINFORCE_with_baseline}
 $$
 \nabla_{\theta}\,J(\theta)
 \;=\;
-\mathbb{E}_{\tau \sim \pi_{\theta}}\!\Big[
+\mathbb{E}_{\tau \sim p_{\theta}}\!\left[
     \sum_{t=0}^{T}
-    \nabla_{\theta} \log \pi_{\theta}(a_t \mid s_t)\,A_t
-\Big],
+    A_t\,\nabla_{\theta} \log \pi_{\theta}(a_t \mid s_t)
+\right],
 $$ {#eq:REINFORCE_with_advantage}
 
 REINFORCE 是 vanilla policy gradient 的一种具体实现，采用蒙特卡洛梯度估计器。
 
-![用于语言模型的基础 REINFORCE 架构。shaped reward 将 reward model 分数与来自参考模型的 KL penalty 相结合。本章将在此基础上进一步展开。](images/reinforce_tikz.png){#fig:reinforce-arch}
+![用于语言模型的基础 REINFORCE 架构。shaped reward 将 reward model 分数与来自参考模型的 KL penalty 相结合。本章将在此基础上进一步展开。](images/reinforce_tikz.png){#fig:reinforce-arch data-dark-src="images/reinforce_tikz-dark.png"}
 
 ### REINFORCE Leave One Out（RLOO）
 
@@ -310,13 +321,13 @@ PPO 则在计算 $A_t$ 之前，从逐 token 奖励中减去逐 token KL，实�
 GRPO 通常保留序列级 advantage，但会在损失中额外添加一个逐 token 项，而非从奖励中减去。
 这些细节与权衡将在本章后续部分进一步讨论。
 
-![REINFORCE Leave-One-Out（RLOO）架构。每个 prompt 生成多条 completion，通过留一法基线进行 advantage 估计，无需学习 value function。](images/rloo_tikz.png){#fig:rloo-arch}
+![REINFORCE Leave-One-Out（RLOO）架构。每个 prompt 生成多条 completion，通过留一法基线进行 advantage 估计，无需学习 value function。](images/rloo_tikz.png){#fig:rloo-arch data-dark-src="images/rloo_tikz-dark.png"}
 
 <!-- A nice formulation of LM RL loss functions is found here https://arxiv.org/pdf/2502.01600 -->
 
 ### Proximal Policy Optimization（PPO）
 
-Proximal Policy Optimization（PPO）[@schulman2017proximal] 是 Deep RL 诸多成功背后的基础算法之一（例如 OpenAI 的 Five，它掌握了 DOTA 2 [@berner2019dota]，以及大量相关研究）。
+Proximal Policy Optimization（PPO）[@schulman2017proximal] 是 Deep RL 诸多成功背后的基础算法之一（例如 OpenAI Five，它掌握了 Dota 2 [@berner2019dota]，以及大量相关研究）。
 PPO 所最大化的目标函数——关于 advantage 和 policy 概率——如下所示：
 
 $$J(\theta) = \min\left(\frac{\pi_\theta(a|s)}{\pi_{\theta_{\text{old}}}(a|s)}A, \text{clip} \left( \frac{\pi_\theta(a|s)}{\pi_{\theta_{\text{old}}}(a|s)}, 1-\varepsilon, 1+\varepsilon \right) A \right).$$ {#eq:PPO_EQN}
@@ -325,12 +336,15 @@ $$J(\theta) = \min\left(\frac{\pi_\theta(a|s)}{\pi_{\theta_{\text{old}}}(a|s)}A,
 这两个 policy 之间的比率源于*重要性采样*，它使我们能够重用在旧 policy 下收集的数据来估计新 policy 的梯度。
 
 回顾 policy gradient 的 advantage 表述（@eq:advantage_policy_gradient），有：
-$$\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta} \left[ \sum_{t=0}^T \nabla_\theta \log \pi_\theta(a_t|s_t) A^{\pi_\theta}(s_t, a_t) \right].$$ {#eq:advantage_policy_gradient_recall}
+$$\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim p_\theta} \left[ \sum_{t=0}^T A^{\pi_\theta}(s_t, a_t) \nabla_\theta \log \pi_\theta(a_t|s_t) \right].$$ {#eq:advantage_policy_gradient_recall}
 
-该期望是在 $\pi_\theta$ 采样的 trajectory 上取的，但实际上我们希望对从固定 policy $\pi_{\theta_{\text{old}}}$ 收集的一批数据进行多次梯度更新。
+该期望是在由 $\pi_\theta$ 导出的 trajectory 分布所采样的 trajectory 上取的，但实际上我们希望对从固定 policy $\pi_{\theta_{\text{old}}}$ 收集的一批数据进行多次梯度更新。
 为了修正分布不匹配的问题，我们乘以重要性权重 $\frac{\pi_\theta(a|s)}{\pi_{\theta_{\text{old}}}(a|s)}$，以反映当前 policy 与数据收集 policy 相比，各样本出现可能性的变化比例。
 若不加约束，当比率偏离 1 较远时，优化这一重要性加权目标可能导致具有破坏性的大幅 policy 更新。
 PPO 通过将比率 clipping 至范围 $[1-\varepsilon, 1+\varepsilon]$ 来解决这一问题，从而确保 policy 在单次更新中的变化幅度不会过大。
+
+请注意，当我们转向 PPO 及其同类算法时，通常处理的是*目标函数*，而非显式的梯度。
+这是因为一旦包含 $\min$ 和 clipping 操作，PPO 目标函数就*没有*易于解释的解析梯度（根据写法不同，梯度大约有 4 项，对应 @fig:ppo-obj 中的各个区域）；直接写出目标函数只是传达这些算法更清晰的方式。
 
 为完整起见，PPO 通常被写成关于时间步的*期望* clipped surrogate 目标函数：
 
@@ -354,6 +368,9 @@ $$ J(\theta) = \frac{1}{|a|} \sum_{t=0}^{|a|} \min\left(\frac{\pi_\theta(a_{t}|s
 
 这是 PPO 的逐 token 版本，同样适用于其他 policy gradient 方法，将在本章实现部分进一步探讨。
 其中，按动作中 token 数量取平均的项 $\frac{1}{|a|}$ 源于常见的实现惯例，并非损失的正式推导所要求（参见 [@liu2025understanding]）。
+
+![PPO 框架。已学习的 value function 使 Generalized Advantage Estimation（GAE）能够计算逐 token 的 advantage，并与 clipped surrogate 目标函数配合使用。](images/ppo_tikz.png){#fig:ppo-arch data-dark-src="images/ppo_tikz-dark.png"}
+
 下面我们将解释在不同的 advantage 值和 policy ratio 下，该损失函数所触发的不同情形。
 在实现层面，PPO 的内部计算涉及两个主要项：1）带有已学习 advantage 的标准 policy gradient，以及 2）基于最大步长限制的 clipped policy gradient。
 
@@ -365,23 +382,36 @@ Policy ratio 是 PPO 及相关算法的核心。
 它由计算策略梯度推导而来，并以一种非常直观的方式控制参数更新。
 对于任意一批数据，在该批次的第一次梯度步骤中，policy ratio 从 1 开始，因为此时 $\pi_{\theta}$ 与 $\pi_{\theta_{\text{old}}}$ 相同。随后，在下一次梯度步骤中，若该步骤提升了某些具有正 advantage 的 token 的概率，则 policy ratio 将大于 1；反之则小于 1。一个常见做法是在更新 $\pi_{\theta_{\text{old}}}$ 之前，对每批数据执行 1 到 4 次梯度步骤。
 
-#### 理解 PPO 目标函数
+### 理解 PPO 目标函数
 
 总体而言，PPO 目标函数可以通过目标值相对于 policy ratio 的曲线图中的两条线来可视化，如 @fig:ppo-obj 所示。
 PPO 目标函数通过改变被采样动作的概率来最大化。
 在数值上，目标函数通过巧妙运用最小值操作，同时处理正 advantage 和负 advantage 的情形，使得更新幅度最多偏离 policy ratio 为 1 的位置一个 epsilon 距离。
 
 在 trust region 内部，PPO 的行为与其他 policy gradient 算法基本相同。
-这是有意为之的！Trust region 是一个用于限制 PPO 及其同类算法最大更新步长的概念，以保证更新的稳定性。PPO 算法的核心，即 clip 和 min/max 函数，正是用来定义这一区域的。目标函数在该区域之外变为平坦。
+这是有意为之的！Trust region 是一个用于限制 PPO 及其同类算法最大更新步长的概念，以保证更新的稳定性。PPO 算法的核心，即 clip 和 min/max 函数，定义了这一区域。目标函数在该区域之外变为平坦。
 
 "trust region" 的概念源自数值优化文献 [@nocedal2006numerical]，但在深度 RL 领域，它因算法 Trust Region Policy Optimization（TRPO）而广为人知，TRPO 被公认为 PPO 的前身 [@schulman2015trust]。
 Trust region 是完整 policy gradient 步骤得以应用的区域，因为在此区域内更新不会被 PPO 目标函数的 max/min 操作所 "clipped"。
 
-![PPO 目标函数在假设 advantage 下不同区域的可视化。"trust region" 描述的是 policy ratio $\rho$ 处于 $1\pm\varepsilon$ 范围内的区域。](images/ppo-viz-4x.png){#fig:ppo-obj}
+![PPO 目标函数 $J(\theta)$ 作为 policy ratio $\rho(\theta)$ 的函数的可视化，分别针对正 advantage 和负 advantage。在每个子图中，三个 ratio 区域均标注了其未裁剪项、裁剪项、所得目标值和梯度。](images/ppo-clip-viz.png){#fig:ppo-obj}
 
-Policy ratio 与 advantage 的组合可能出现几种不同的配置。我们将这些情形分为两组：正 advantage 和负 advantage。
+Policy ratio 与 advantage 的组合可能出现几种不同的配置，@fig:ppo-obj 按 advantage $A_t$ 的符号以及 policy ratio $\rho(\theta)$ 落入三个区域中的哪一个对其进行了枚举。在每个区域中，有两个因素决定结果：advantage 的符号决定我们希望让该动作更可能还是更不可能发生，而 $\min$ 操作则选取未裁剪项 $\rho(\theta) A_t$ 或其裁剪后的对应项。
 
-**正 Advantage（$A_t > 0$）**
+clipping 只会在两个区域中将梯度置零，在这两个区域里 policy *已经*朝期望方向调整了被采样动作，并越过了 trust region 的边界：
+
+- **正 advantage 且 $\rho(\theta) > 1+\varepsilon$**：该动作在 $\pi_\theta$ 下已经比在 $\pi_{\theta_{\text{old}}}$ 下显著更可能被采取。目标函数在 $(1+\varepsilon)A_t$ 处饱和，其梯度为零，不执行任何更新——我们避免过度强化一个已经被更多表达的动作。
+- **负 advantage 且 $\rho(\theta) < 1-\varepsilon$**：该动作在 $\pi_\theta$ 下已经显著更不可能被采取。目标函数在 $(1-\varepsilon)A_t$ 处饱和，其梯度同样为零，不执行任何更新——我们避免过度压制一个已经被抑制的动作。
+
+在其他所有情形下，未裁剪项 $\rho(\theta) A_t$ 起作用，PPO 执行标准的 policy gradient 步骤：当 $A_t > 0$ 时提高该动作的概率，当 $A_t < 0$ 时降低其概率。我们可以从 @fig:ppo-obj 中读出各区域对更新后 policy $\pi_\theta$ 的要求：
+
+- 正 advantage 下的倾斜、未裁剪区域（绿色）**提高**被采样动作的概率；
+- 负 advantage 下的倾斜、未裁剪区域（红色）**降低**其概率；
+- 平坦的、被裁剪的区域（灰色）使 policy **保持不变**，因为其梯度为零。
+
+下面按项逐一写出这些相同的区域：
+
+#### 正 Advantage（$A_t > 0$）
 
 这意味着根据 value function，所采取的动作是有益的，我们希望在未来提高采取该动作的概率。现在，让我们来看 policy ratio $\rho(\theta)$ 的不同情形：
 
@@ -417,7 +447,7 @@ Policy ratio 与 advantage 的组合可能出现几种不同的配置。我们�
 - 仅当 $\pi_{\text{new}}(a) \leq (1+\varepsilon) \pi_{\text{old}}(a)$ 时，我们才执行梯度步骤。直观上，由于 advantage 为正，我们希望提升该动作的概率，但不应提升过多以至于其概率显著增大。
 - 关键在于，当 $\pi_{\text{new}}(a) > (1+\varepsilon) \pi_{\text{old}}(a)$ 时，我们不执行任何更新，clipped 目标函数的梯度为 $0$。直观上，该动作在新策略下已经得到了更多的体现，因此我们不希望过度强化它。
 
-**负 Advantage（$A_t < 0$）**
+#### 负 Advantage（$A_t < 0$）
 
 这意味着根据 value function，所采取的动作是有害的，我们希望在未来降低采取该动作的概率。现在，让我们来看 policy ratio $\rho(\theta)$ 的不同情形：
 
@@ -456,7 +486,7 @@ Policy ratio 与 advantage 的组合可能出现几种不同的配置。我们�
 必须牢记，在 trust region 内，PPO 与标准形式的 policy gradient 大体相同。
 
 
-#### Value Functions 与 PPO
+### Value Functions 与 PPO
 
 PPO 中的 value function 是模型的一个额外副本，用于预测每个 token 的价值。
 在传统 RL 中，token（或状态）的价值是预测从该时刻起（通常带有折扣）的未来回报。
@@ -469,7 +499,7 @@ Generalized Advantage Estimation（GAE）被认为是现代系统中最先进的
 Value function 也可以用来自 rollout 的 Monte Carlo 估计来学习，这些 rollout 也用于更新策略。
 PPO 有两个损失——一个用于学习 value function，另一个用于利用该 value function 来更新策略。
 
-![Value function 训练使用 on-policy rollout 来计算目标。模型在每个 token 处预测 $V_t$，通过均方误差（MSE）与目标回报 $\hat{V}_t$ 进行训练。Advantage $A_t = \hat{V}_t - V_t$ 随后对 policy gradient 更新进行加权。](images/value_fn_training.png){#fig:value_fn_training}
+![Value function 训练使用 on-policy rollout 来计算目标。模型在每个 token 处预测 $V_t$，通过均方误差（MSE）与目标回报 $\hat{V}_t$ 进行训练。Advantage $A_t = \hat{V}_t - V_t$ 随后对 policy gradient 更新进行加权。](images/value_fn_training.png){#fig:value_fn_training data-dark-src="images/value_fn_training-dark.png"}
 
 下面展示了一个 value network 损失的简单示例实现。
 ```python
@@ -553,7 +583,7 @@ J(\theta) = \frac{1}{G}\sum_{i=1}^G  \frac{1}{|a_i|} \sum_{t=1}^{|a_i|} \Bigg( &
 
 $$A_i = \frac{r_i - \text{mean}({r_1, r_2, \cdots, r_G})}{\text{std}({r_1, r_2, \cdots, r_G})}.$$ {#eq:GRPO_ADV}
 
-![GRPO 架构。Advantage 相对于群体均值和标准差进行归一化。KL 惩罚直接应用于损失，而非对奖励进行塑形。](images/grpo_tikz.png){#fig:grpo-arch}
+![GRPO 架构。Advantage 相对于群体均值和标准差进行归一化。KL 惩罚直接应用于损失，而非对奖励进行塑形。](images/grpo_tikz.png){#fig:grpo-arch data-dark-src="images/grpo_tikz-dark.png"}
 
 直观而言，GRPO 更新是在一个 batch 内对同一问题的多个答案进行比较。
 模型学习变得更像被标记为正确的答案，而更不像其他答案。
@@ -561,10 +591,10 @@ $$A_i = \frac{r_i - \text{mean}({r_1, r_2, \cdots, r_G})}{\text{std}({r_1, r_2, 
 相对于 PPO、REINFORCE 以及更广泛地使用 reward model 评分进行的 RLHF（相对于输出奖励），GRPO 通常以每个 prompt 更高数量的样本运行，因为 advantage 完全取决于一个 completion 相对于同一 prompt 下其他 completion 的相对价值。
 在这里，当前 policy 对给定 prompt 生成多个响应，而群体范围内的 GRPO advantage 估计能获得有价值的上下文信息。
 PPO 和原始 policy gradient 算法旨在准确估计每个 completion 的奖励（事实上，在某些情况下，更多的 completion 对改善 value 估计几乎没有帮助）。
-GRPO 及其变体特别适合现代语言模型工具，因为对给定 prompt 生成多个 completion 非常自然（尤其是与机器人任务中从固定环境状态执行多个动作相比）。
+GRPO 及其变体特别适合现代语言模型工具，因为对给定 prompt 拥有多个 completion 非常自然（尤其是与机器人任务中从固定环境状态执行多个动作相比）。
 
 GRPO 的 advantage 计算在其偏差上存在权衡。
-对标准差的归一化会对 batch 中答案正确性变异性低的问题给予更高奖励。
+对标准差的归一化会奖励 batch 中答案正确性变异性低的问题。
 对于几乎全部正确或全部错误的问题，标准差会更低，advantage 会更高。
 Liu 等人 2025 [@liu2025understanding] 提出移除标准差项以消除这一偏差，但这会以降低那些只有少数正确答案的全错误问题的权重为代价——而这些情况可能被视为对模型有价值的学习信号。
 那些高方差的 prompt 恰恰可能是最难的情形，只有极少数采样的 completion 找到了正确答案，从而提供了强烈的训练信号。
@@ -575,7 +605,7 @@ Liu 等人 2025 [@liu2025understanding] 提出移除标准差项以消除这一�
 最后，GRPO 的 advantage 估计也可以在不使用 PPO clipping 的情况下应用于更原始的 policy gradient 版本（例如 REINFORCE），但这不是规范形式。
 作为这些算法相互交织的一个示例，我们可以证明，GRPO 的一个变体——Dr. GRPO（GRPO Done Right）[@liu2025understanding]——中的 advantage 估计与 RLOO 估计（使用其他样本的平均奖励作为 baseline）在一个常数缩放因子上等价（由于归一化 advantage 的实现细节，这个常数因子通常不影响结果）。
 Dr. GRPO 从 @eq:GRPO_ADV 中移除了标准差归一化项——注意这同时会*放大* advantage，相当于在答案分数存在方差的样本上提高 GRPO 的学习率。
-这解决了对低奖励方差问题的偏差——即几乎所有答案都正确或错误的情况——但可能带来潜在的代价，即对于只有一个样本答对的问题，从中学习是重要的。
+这解决了对低奖励方差问题的偏差——即几乎所有答案都正确或错误的情况——但如果从只有一个样本答对的问题中学习很重要，则可能带来潜在的代价。
 Dr. GRPO 中群体大小为 $G$ 的第 $i$ 个 completion 的 advantage 定义为：
 
 $$ \tilde{A}_i = r_i - \text{mean}({r_1, r_2, \cdots, r_G}) = r_i - \frac{1}{G}\sum_{j=1}^G r_j $$ {#eq:DrGRPO_ADV}
@@ -617,10 +647,10 @@ PPO 和 GRPO 在 token 层面应用重要性采样，并通过 clipping *代理�
 对于罕见但重要的 token——例如模型最初赋予低概率的关键推理步骤——这种"token 丢弃"现象会阻碍模型学习更可靠地生成这些 token。
 
 Group Sequence Policy Optimization（GSPO）[@zheng2025gspo] 在 GRPO 的基础上进行了扩展，将重要性比率的计算粒度从 token 层面提升至序列层面。
-这一算法的实践动机，以及与之并列、同样修改了 policy gradient 算法中重要性采样计算方式的 CISPO（我们稍后将讨论），在于逐 token 的重要性采样比率在数值上往往不稳定。
+这一算法的实践动机——以及与之并列、修改了 policy gradient 算法中重要性采样计算方式的 CISPO（我们稍后将讨论）的动机——在于逐 token 的重要性采样比率在数值上往往不稳定。
 其概念动机在于：当奖励在序列层面赋予时（如大多数 RLHF 和 RLVR 场景），重要性采样的修正也应与该粒度相匹配。
 
-Token 级别的比率对于长序列和/或大型稀疏模型（例如现代混合专家模型，MoE）而言可能表现异常：单个比率较大的 token 可能主导整个策略更新，或者一个响应中的许多 token 各自独立被 clip，从而使单个响应的学习信号碎片化。
+Token 级别的比率对于长序列和/或大型稀疏模型（例如现代混合专家（MoE）模型）而言可能表现异常：单个比率较大的 token 可能主导整个策略更新，或者一个响应中的许多 token 各自独立被 clip，从而使单个响应的学习信号碎片化。
 GSPO 通过为每个响应计算单一的重要性权重来解决这一问题。
 
 回顾一下，完整响应的概率以自回归方式分解：
@@ -674,6 +704,50 @@ CISPO 还允许非对称的 clipping 边界（$\varepsilon_{\text{low}} \neq \va
 相关工作还包括 Tapered Off-Policy REINFORCE（TOPR）[@leroux2025topr]，它同样直接截断重要性采样权重（类似 CISPO，而非像 PPO/GRPO 那样在目标函数内截断），但在序列层面运作（类似 GSPO），并根据奖励符号使用非对称截断——对正奖励不进行重要性采样修正，而对负奖励将比率截断至 $[0, 1]$——从而实现稳定的离策略（off-policy）学习。
 
 
+### 算法比较
+
+本章中的每个算法都共享相同的核心梯度形式（@eq:policy_gradient_intuition），但在如何估计优势以及控制优化方面有所不同：
+
+- **REINFORCE**：简单的 policy gradient 实现，包含对奖励的蒙特卡洛估计，并引入基于状态的 baseline 以降低方差。
+- **RLOO**：每个提示词采用多个样本的 REINFORCE，每个样本的 baseline 为其他样本的平均奖励（leave-one-out），以降低梯度方差。
+- **PPO**：增加了学习到的价值函数和 clipped policy ratio，以获得更准确、更稳定的梯度更新。
+- **GRPO**：PPO 的简化变体，将每个提示词的多个补全分组，并在组内归一化奖励以计算优势，无需价值函数。
+- **CISPO**：一种 REINFORCE 风格的算法，对重要性采样权重（而非 PPO/GRPO 中的目标函数）进行 clipping，并使用 stop-gradient 保证稳定性，使每个 token 都能接收到梯度信号。
+- **GSPO**：与 GRPO 类似，但按补全长度对 policy ratio 进行归一化，以防止长度偏差。
+- **DPO**：不是 RL 算法，而是一种通过完全绕过独立的 reward model 来解决相同偏好优化问题的方法，直接从偏好对进行优化（见第 8 章）。
+
+上述所有 policy gradient 算法在推导上均为 on-policy，尽管大多数在实践中略微以 off-policy 方式应用。DPO 及第 8 章中的其他直接对齐算法默认为 off-policy。
+所有算法均可与学习到的 reward model 或可验证奖励配对使用。
+只有 PPO 需要学习到的价值函数。
+REINFORCE 和 RLOO 没有重要性采样比率——其余算法各自引入了一个，以便对每批 rollout 执行多个梯度步骤，在粒度和 clipping 策略上有所不同，如下表所示。
+
+| 方法 | IS 粒度 | Clipping 风格 | 优势 |
+| :----- | :-----------: | :------------------: | :-------------------: |
+| **REINFORCE** | None | None | Monte Carlo baseline |
+| **RLOO** | None | None | Leave-one-out |
+| **PPO** | Token | Objective (bilateral) | Learned value fn |
+| **GRPO** | Token | Objective (bilateral) | Group-relative |
+| **GSPO** | 序列 | 目标函数（双边） | 组相对 |
+| **CISPO** | Token | 权重（stop-grad） | 组相对 |
+表：policy gradient 算法对比。 {#tbl:pg_compare}
+
+每种方法的核心损失函数 $\mathcal{L}(\theta)$ 如下：
+
+$$\begin{aligned}
+\textbf{REINFORCE:}\quad & -\frac{1}{T}\sum_{t=1}^{T}\log \pi_\theta(a_t\mid s_t)\,\big(G_t - b(s_t)\big) \\[6pt]
+\textbf{RLOO:}\quad & -\frac{1}{K}\sum_{i=1}^{K}\sum_t \log \pi_\theta(a_{i,t}\mid s_{i,t})\left(R_i-\frac{1}{K-1}\sum_{j\neq i}R_j\right) \\[6pt]
+\textbf{CISPO:}\quad & -\sum_{i,t} \mathrm{sg}(\hat{\rho}_{i,t})\, A_{i,t} \log \pi_\theta(a_{i,t}\mid s_{i,t}) \\
+& \quad \hat{\rho}_{i,t} = \mathrm{clip}(\rho_{i,t},\, 1-\varepsilon,\, 1+\varepsilon) \\[6pt]
+\textbf{PPO:}\quad & -\frac{1}{T}\sum_{t=1}^{T}\min\!\big(\rho_t A_t,\ \mathrm{clip}(\rho_t,1-\varepsilon,1+\varepsilon)\, A_t\big) \\
+& \quad \rho_t = \frac{\pi_\theta(a_t\mid s_t)}{\pi_{\theta_{\text{old}}}(a_t\mid s_t)} \\[6pt]
+\textbf{GRPO:}\quad & -\frac{1}{G}\sum_{i=1}^{G}\min\!\big(\rho_i A_i,\ \mathrm{clip}(\rho_i,1-\varepsilon,1+\varepsilon)\, A_i\big) \\
+& \quad \rho_i = \frac{\pi_\theta(a_i\mid s)}{\pi_{\theta_{\text{old}}}(a_i\mid s)},\quad A_i = \frac{r_i-\mathrm{mean}(r_{1:G})}{\mathrm{std}(r_{1:G})} \\[6pt]
+\textbf{GSPO:}\quad & -\frac{1}{G}\sum_{i=1}^{G}\min\!\big(\rho_i A_i,\ \mathrm{clip}(\rho_i,1-\varepsilon,1+\varepsilon)\, A_i\big) \\
+& \quad \rho_i = \left(\frac{\pi_\theta(a_i\mid s)}{\pi_{\theta_{\text{old}}}(a_i\mid s)}\right)^{1/|a_i|} \\[6pt]
+\textbf{DPO:}\quad & -\mathbb{E}_{(x,y^{w},y^{l})}\!\left[\log \sigma\!\big(\beta[\Delta\log \pi_\theta(x)-\Delta\log \pi_{\mathrm{ref}}(x)]\big)\right]
+\end{aligned}$$
+
+
 ## 实现
 
 与最初开发这些算法的深度 RL 文献相比，为优化语言模型或其他大型 AI 模型而实现 RL 需要许多细微的实现细节。
@@ -702,7 +776,7 @@ RLHF 的一种失效模式是模型的回答被频繁截断，导致 reward mode
 ```python
 pg_loss = -advantages * ratio
 ```
-这里的 ratio 是新策略模型概率相对于参考模型的（逐 token）概率比率（通常由对数概率之差计算得出）。
+这里的 ratio 是新策略模型概率相对于生成该批数据的旧策略的（逐 token）概率比率（通常由对数概率之差计算得出）。
 
 为了理解这个公式，有必要了解一批更新中可能出现的不同情况。
 请记住，我们希望随着模型在任务上的改进，损失能够*降低*。
@@ -828,8 +902,7 @@ print("masked_mean_token_level", masked_mean_token_level)
 # masked_mean tensor([2., 2.], grad_fn=<DivBackward0>)
 # masked_sum tensor([1.1429, 2.0000], grad_fn=<DivBackward0>)
 # masked_mean_token_level tensor(1., grad_fn=<DivBackward0>)
-```
-```python
+
 masked_mean_result.mean().backward()
 print("ratio.grad", ratio.grad)
 ratio.grad.zero_()
@@ -924,7 +997,7 @@ policy gradient 的理论推导依赖于所有动作严格遵循 on-policy 原�
 
 相关方法正在探索完全 off-policy 的 policy gradient 算法 [@leroux2025topr]。
 
-### 截断重要性采样（TIS）
+### 截断重要性采样
 
 截断重要性采样（Truncated Importance Sampling，TIS）是现代异步语言模型 RL 框架中用于稳定训练的重要工具。
 重要性采样是一种修正方法，将从某一分布中采集的样本重新加权，以估计另一分布下的期望（如 @eq:IS_identity 中所介绍）。
@@ -943,13 +1016,17 @@ $$ {#eq:tis_backend}
 这两种修正相辅相成，但引入 policy gradient 实现中的原因各不相同——前者补偿 RL 批次训练过程中的策略漂移，后者则补偿实现层面引入的分布偏差——二者可以同时应用。
 它们的组合方式取决于具体算法：
 
-**带 TIS 的 REINFORCE**（单次梯度步骤）：不存在策略漂移（$\pi_\theta = \pi_{\theta_\text{old}}$），因此唯一的不匹配来自 learner 与 sampler 之间。
+#### 带 TIS 的 REINFORCE（单次梯度步骤）
+
+不存在策略漂移（$\pi_\theta = \pi_{\theta_\text{old}}$），因此唯一的不匹配来自 learner 与 sampler 之间。
 此时 $\pi_{\theta_\text{old}} = \pi_\text{gen}$，TIS 直接修正 learner–sampler 之间的差距：
 
 $$
 \nabla_\theta J \approx \mathbb{E}_{a \sim \pi_\theta^{\text{sampler}}} \left[ \tilde{\rho}_t^{\text{learner}} \cdot A_t \cdot \nabla_\theta \log \pi_\theta^{\text{learner}}(a_t \mid s, a_{<t}) \right].
 $$ {#eq:reinforce_tis}
-**带有 TIS 的 PPO/GRPO**（多次梯度步骤）：此时两个比率均处于激活状态。
+#### 带有 TIS 的 PPO/GRPO（多次梯度步骤）
+
+此时两个比率均处于激活状态。
 在仔细的实现中，policy ratio 中的"旧 logprobs"在学习器（learner）上重新计算（GSPO 论文对此有所讨论），因此 policy ratio $\rho_t^{\text{policy}} = \pi_\theta^{\text{learner}} / \pi_{\theta_\text{old}}^{\text{learner}}$ 捕捉的是纯粹的 policy 漂移，而 $\tilde{\rho}_t^{\text{learner}} = \min(\pi_{\theta_\text{old}}^{\text{learner}} / \pi_{\theta_\text{old}}^{\text{sampler}},\; C)$ 则单独修正生成检查点处的后端不匹配：
 
 $$
@@ -977,10 +1054,10 @@ per_token_pg_loss = per_token_pg_loss * tis_weight.detach()
 $[-10, 10]$ 的截断仅用于指数运算前的数值稳定性；真正的截断重要性采样步骤是在 $C$ 处进行的单侧截断。
 在实践中，围绕这些 logprobs 的记录管理——存储生成时的采样器 logprobs、在旧检查点重新计算学习器 logprobs、以及在梯度步骤中追踪当前 logprobs——构成了分布式 RL 框架中脚手架代码的重要组成部分。
 与 GSPO 不同，此修正是在 token 级别进行的，因为它处理的是 token 级别的数值不匹配，而非序列级别的 reward 粒度问题。
-针对学习器–采样器比率的 TIS 已被主要开源 RL 框架所采用（VeRL、OpenRLHF、SkyRL、OAT，以及使用 $C = 2$ 的 Open Instruct），对于长推理轨迹（第 7 章）而言，其重要性日益凸显——在长推理轨迹中，每个 token 的微小差异会在数千个生成 token 上不断累积。
+针对学习器–采样器比率的 TIS 已被主要开源 RL 框架所采用（VeRL、TRL、OpenRLHF、SkyRL、OAT，以及使用 $C = 2$ 的 Open Instruct），对于长推理轨迹（第 7 章）而言，其重要性日益凸显——在长推理轨迹中，每个 token 的微小差异会在数千个生成 token 上不断累积。
 
 
-### 示例：Proximal Policy Optimization
+### 示例：PPO
 
 PPO 有非常多的实现版本。
 以下展示的是核心 *loss* 计算过程。
@@ -1072,7 +1149,7 @@ $$J(\theta) = \frac{1}{G}\sum_{i=1}^G \left(\frac{\pi_\theta(a_i|s)}{\left[\pi_{
 这导致了 PPO 或 GRPO 的实现中，第二个 policy gradient 和 clipping 逻辑可以被省略，从而使优化器更接近标准的 policy gradient。
 
 
-### 示例：Group Relative Policy Optimization
+### 示例：GRPO
 
 DeepSeekMath 论文描述了 GRPO 的一些实现细节，这些细节与 PPO 有所不同 [@shao2024deepseekmath]，尤其是与深度 RL 中 PPO 的标准应用相比，而非语言模型中的应用。
 例如，RLHF 优化中的 KL penalty（回顾一下，KL penalty 也用于在无 reward model 的情况下，基于可验证奖励训练推理模型）是直接应用在 loss 更新中，而非 reward 函数中。
@@ -1089,7 +1166,7 @@ $$ L = L_{\text{policy gradient}} + \beta * \mathcal{D}_{\text{KL}} $$ {#eq:grpo
 
 ```python
 # B: Batch Size, L: Sequence Length, G: Number of Generations
-# Compute grouped-wise rewards # Shape: (B,)
+# Compute group-wise rewards # Shape: (B,)
 mean_grouped_rewards = rewards.view(-1, self.num_generations).mean(dim=1)
 std_grouped_rewards = rewards.view(-1, self.num_generations).std(dim=1)    
 
@@ -1165,50 +1242,6 @@ RLOO 其余的实现细节遵循 policy-gradient 实现中的其他权衡。
 为了掌握 policy-gradient 算法的应用，还有无数其他需要考虑的因素。
 本节将探讨成功部署 policy-gradient RL 算法时的一些长尾复杂性。
 
-### 算法比较
-
-本章中的每个算法都共享相同的核心梯度形式（@eq:policy_gradient_intuition），但在如何估计优势以及控制优化方面有所不同：
-
-- **REINFORCE**：简单的 policy gradient 实现，包含对奖励的蒙特卡洛估计，并引入基于状态的 baseline 以降低方差。
-- **RLOO**：每个提示词采用多个样本的 REINFORCE，每个样本的 baseline 为其他样本的平均奖励（leave-one-out），以降低梯度方差。
-- **PPO**：增加了学习到的价值函数和 clipped policy ratio，以获得更准确、更稳定的梯度更新。
-- **GRPO**：PPO 的简化变体，将每个提示词的多个补全分组，并在组内归一化奖励以计算优势，无需价值函数。
-- **CISPO**：一种 REINFORCE 风格的算法，对重要性采样权重（而非 PPO/GRPO 中的目标函数）进行 clipping，并使用 stop-gradient 保证稳定性，使每个 token 都能接收到梯度信号。
-- **GSPO**：与 GRPO 类似，但按补全长度对 policy ratio 进行归一化，以防止长度偏差。
-- **DPO**：不是 RL 算法，而是一种通过完全绕过独立的 reward model 来解决相同偏好优化问题的方法，直接从偏好对进行优化（见第 8 章）。
-
-上述所有 policy gradient 算法在推导上均为 on-policy，尽管大多数在实践中略微以 off-policy 方式应用。DPO 及第 8 章中的其他直接对齐算法默认为 off-policy。
-所有算法均可与学习到的 reward model 或可验证奖励配对使用。
-只有 PPO 需要学习到的价值函数。
-REINFORCE 和 RLOO 没有重要性采样比率——其余算法各自引入了一个，以便对每批 rollout 执行多个梯度步骤，在粒度和 clipping 策略上有所不同，如下表所示。
-
-| 方法 | IS 粒度 | Clipping 风格 | 优势 |
-| :----- | :-----------: | :------------------: | :-------------------: |
-| **REINFORCE** | None | None | Monte Carlo baseline |
-| **RLOO** | None | None | Leave-one-out |
-| **PPO** | Token | Objective (bilateral) | Learned value fn |
-| **GRPO** | Token | Objective (bilateral) | Group-relative |
-| **GSPO** | 序列 | 目标函数（双边） | 组相对 |
-| **CISPO** | Token | 权重（stop-grad） | 组相对 |
-表：policy gradient 算法对比。 {#tbl:pg_compare}
-
-每种方法的核心损失函数 $\mathcal{L}(\theta)$ 如下：
-
-$$\begin{aligned}
-\textbf{REINFORCE:}\quad & -\frac{1}{T}\sum_{t=1}^{T}\log \pi_\theta(a_t\mid s_t)\,\big(G_t - b(s_t)\big) \\[6pt]
-\textbf{RLOO:}\quad & -\frac{1}{K}\sum_{i=1}^{K}\sum_t \log \pi_\theta(a_{i,t}\mid s_{i,t})\left(R_i-\frac{1}{K-1}\sum_{j\neq i}R_j\right) \\[6pt]
-\textbf{CISPO:}\quad & -\sum_{i,t} \mathrm{sg}(\hat{\rho}_{i,t})\, A_{i,t} \log \pi_\theta(a_{i,t}\mid s_{i,t}) \\
-& \quad \hat{\rho}_{i,t} = \mathrm{clip}(\rho_{i,t},\, 1-\varepsilon,\, 1+\varepsilon) \\[6pt]
-\textbf{PPO:}\quad & -\frac{1}{T}\sum_{t=1}^{T}\min\!\big(\rho_t A_t,\ \mathrm{clip}(\rho_t,1-\varepsilon,1+\varepsilon)\, A_t\big) \\
-& \quad \rho_t = \frac{\pi_\theta(a_t\mid s_t)}{\pi_{\theta_{\text{old}}}(a_t\mid s_t)} \\[6pt]
-\textbf{GRPO:}\quad & -\frac{1}{G}\sum_{i=1}^{G}\min\!\big(\rho_i A_i,\ \mathrm{clip}(\rho_i,1-\varepsilon,1+\varepsilon)\, A_i\big) \\
-& \quad \rho_i = \frac{\pi_\theta(a_i\mid s)}{\pi_{\theta_{\text{old}}}(a_i\mid s)},\quad A_i = \frac{r_i-\mathrm{mean}(r_{1:G})}{\mathrm{std}(r_{1:G})} \\[6pt]
-\textbf{GSPO:}\quad & -\frac{1}{G}\sum_{i=1}^{G}\min\!\big(\rho_i A_i,\ \mathrm{clip}(\rho_i,1-\varepsilon,1+\varepsilon)\, A_i\big) \\
-& \quad \rho_i = \left(\frac{\pi_\theta(a_i\mid s)}{\pi_{\theta_{\text{old}}}(a_i\mid s)}\right)^{1/|a_i|} \\[6pt]
-\textbf{DPO:}\quad & -\mathbb{E}_{(x,y^{w},y^{l})}\!\left[\log \sigma\!\big(\beta[\Delta\log \pi_\theta(x)-\Delta\log \pi_{\mathrm{ref}}(x)]\big)\right]
-\end{aligned}$$
-
-
 ### 广义优势估计（GAE）
 
 广义优势估计（Generalized Advantage Estimation，GAE）是一种用于计算 policy gradient 算法中优势值的替代方法 [@schulman2015high]，它能更好地平衡偏差与方差之间的权衡。
@@ -1241,7 +1274,7 @@ $$
 \hat{A}_t^{GAE(\gamma,\lambda)} = (1-\lambda)(\hat{A}_t^{(1)} + \lambda\hat{A}_t^{(2)} + \lambda^2\hat{A}_t^{(3)} + \cdots) \\
 = (1-\lambda)(\delta_t^V + \lambda(\delta_t^V + \gamma\delta_{t+1}^V) + \lambda^2(\delta_t^V + \gamma\delta_{t+1}^V + \gamma^2\delta_{t+2}^V) + \cdots) \\
 = (1-\lambda)(\delta_t^V(1 + \lambda + \lambda^2 + \cdots) + \gamma\delta_{t+1}^V(\lambda + \lambda^2 + \cdots) + \cdots) \\
-= (1-\lambda)(\delta_t^V\frac{1}{1-\lambda} + \gamma\delta_{t+1}^V\frac{\lambda}{1-\lambda} + \cdots) \\
+= (1-\lambda)\left(\delta_t^V\frac{1}{1-\lambda} + \gamma\delta_{t+1}^V\frac{\lambda}{1-\lambda} + \cdots\right) \\
 = \sum_{l=0}^{\infty}(\gamma\lambda)^l\delta_{t+l}^V
 \end{array}
 $$ {#eq:GAE_DFN}
@@ -1310,3 +1343,41 @@ advantages = advantages.detach()   # for policy loss
 - 其他 REINFORCE 算法的实现也专为语言模型设计，例如 **ReMax** [@li2023remax]，它实现了一种基线归一化，专门设计用于适应 reward model 推理中的不确定性来源。
 - 一些基础模型，如 Apple Intelligence Foundation Models [@gunter2024apple] 或 Kimi k1.5 推理模型 [@team2025kimi]，使用了**镜像下降策略优化（MDPO）** [@tomar2020mirror] 的变体。相关基础研究仍在进一步发展 [@zhang2025improving]，但镜像下降是一种优化方法，而非直接的 policy gradient 算法。这里重要的是，它以与现有 RL 基础设施非常相似的方式被替换进去。
 - **解耦裁剪与动态采样策略优化（DAPO）** 提出了对 GRPO 的 4 项修改，以更好地适应推理语言模型，其中需要长推理链，且新的、利用不足的 token 需要提高概率 [@yu2025dapo]。这些修改为：1，使用两个不同的裁剪超参数 $\varepsilon_\text{low}$ 和 $\varepsilon_\text{high}$，使得对数比正侧的裁剪可以采取更大的步骤以获得更好的探索；2，动态采样，移除批次中所有样本奖励 = 0 或奖励 = 1 的样本（无学习信号）；3，使用上文在"实现：GRPO"中讨论的按 token 的损失；4，对过长样本施加软惩罚，以避免从截断答案中学习。
+- **基于价值的增强近端策略优化（VAPO）** [@yuan2025vapo] 将 DAPO 的优化（包括 clip-higher、token 级 policy-gradient 以及不同的长度归一化）与 Value-Calibrated PPO [@yuan2025s] 的见解相结合，对 value function 进行预训练并使用长度自适应 GAE，展示了基于价值的方法相对于 GRPO 的潜力。
+
+## 建议实验
+
+配套实现位于 `code/policy_gradients/`，专为小规模、可观察的 RL 运行而设计。
+默认配置在 `reasoning-gym` 的 `spell_backward` 程序化任务上训练 `Qwen/Qwen3-1.7B`，这是一个很好的入门练习，因为失败和部分进展都很容易检查。
+
+1. **使用 GRPO 运行单词反转任务。**
+
+   ```bash
+   cd code/
+   uv run python -m policy_gradients.train --config policy_gradients/configs/grpo.yaml
+   ```
+
+   跟踪 `avg_correctness`、`avg_format` 和 `avg_binary`。
+   首先值得问的问题是：每个 prompt 组内是否存在对比——如果所有采样的 completion 全对或全错，组相对更新几乎没有学习信号。
+
+2. **比较组相对估计器与单样本估计器。**
+   运行匹配的起始配置：
+
+   ```bash
+   cd code/
+   uv run python -m policy_gradients.train --config policy_gradients/configs/reinforce.yaml
+   uv run python -m policy_gradients.train --config policy_gradients/configs/rloo.yaml
+   uv run python -m policy_gradients.train --config policy_gradients/configs/grpo.yaml
+   ```
+
+   比较正确性信号提升的速度以及损失的噪声程度。
+   RLOO 和 GRPO 应该能让 prompt 内 baseline 的作用比单纯的方程更加具体。
+
+3. **扫描对比相关的旋钮。**
+   复制 `policy_gradients/configs/grpo.yaml`，并改变 `num_rollouts`、`temperature`、`data.size` 和 `format_weight`。
+   较小的 `num_rollouts` 会降低组内对比；过低的 temperature 可能使样本坍缩；过高的 temperature 可能产生过多格式错误的答案。
+   这是理解为何 RLVR 方案在触及优化器之前往往要在采样设置上投入大量精力的最简单方式。
+
+4. **从玩具奖励转向数学任务。**
+   对于 GSM8K 风格的实验，在添加新的在线 RL 环境之前，先从 `code/reward_models/train_orm.py` 和 `code/rejection_sampling/` 的示例入手。
+   一个很好的贡献是提供一个小型的 `reasoning-gym` 或 GSM8K policy-gradient 配置，它能在 1B 以下的 Qwen 模型上运行，并报告相同的组内对比诊断指标。

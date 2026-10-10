@@ -1,4 +1,4 @@
-<!-- source-commit: 02c6d49 -->
+<!-- source-commit: eecc49e -->
 <!--
   Copyright (c) 2025-2026 Nathan Lambert.
   Licensed under CC BY-NC-SA 4.0:
@@ -8,13 +8,17 @@
 ---
 prev-chapter: "评估"
 prev-url: "16-evaluation"
-page-title: 产品与 Character
-search-title: "第 17 章：产品与 Character"
+page-title: 打造模型 Character 与产品
+search-title: "第 17 章：打造模型 Character 与产品"
+meta-description: "RLHF 与 post-training 如何塑造模型 character、产品行为、UX 以及已部署的 AI 系统。"
 next-chapter: "定义"
 next-url: "appendix-a-definitions"
+lectures:
+  - video: "https://www.youtube.com/watch?v=xECWRYBxq1E&list=PLL1tdVxB1CpVpEtMHxwuR4uI4Lxjw00_y&index=20"
+    label: "第十三讲：Character 训练导论"
 ---
 
-# 产品、UX 与模型 Character
+# 打造模型 Character 与产品
 
 RLHF 及后训练的前沿研究展示了这些技术如何在企业中被用于打造领先产品。
 随着 RLHF 日趋成熟，它所解决的问题正逐渐超越传统的研究领域与优化公开基准测试的范畴。
@@ -23,12 +27,13 @@ RLHF 及后训练的前沿研究展示了这些技术如何在企业中被用于
 ## Character 训练
 
 用户改变模型行为的默认方式是在推理时编写一段描述性提示词，例如，与其直接问模型"帮我写一封邮件，总结我上个月的工作"，不如写成"以一名精疲力竭的员工身份，帮我写一封邮件，总结我上个月的工作"。
-Character 训练是后训练的子集，专门用于在模型内部塑造特质，以调整模型回复的个性、价值观和/或表达方式 [@maiya2025open]。
+Character 训练是后训练的子集，专门用于在模型内部塑造特质，以调整模型回复的个性、价值观和/或对内容的表达方式 [@maiya2025open]。
 Character 训练的目的是修改模型权重，为给定模型打造稳定的基础人格。
-Character 训练对语言模型聊天机器人的用户体验至关重要，但在公开文献中鲜有探讨。
-研究表明，通过在人格特定数据上进行 fine-tuning 所实现的 character 训练，比提示词方法更具鲁棒性 [@maiya2025open]（该训练方法也优于一种无需梯度更新或输入上下文即可操控模型的新方法——激活引导（Activation Steering）[@turner2023activation]，该方法已通过 persona vectors [@chen2025persona] 专门应用于 character 特质，本章后续将有介绍）。
+Character 训练对语言模型聊天机器人的用户体验至关重要，但截至 2026 年年中，在公开文献中仍鲜有探讨。
+研究表明，通过在人格特定数据上进行 fine-tuning 所实现的 character 训练，比提示词方法更具鲁棒性 [@maiya2025open]。
+Fine-tuning 也优于激活引导（Activation Steering）[@turner2023activation]——这是一种无需梯度更新或输入上下文即可操控模型的方法，已通过 persona vectors [@chen2025persona] 专门应用于 character 特质，本章后续将有介绍。
 
-截至本书写作之时，我们尚不清楚 character 训练究竟对模型产生哪些核心权衡、应如何研究它，以及它能在多大程度上提升用户偏好指标——例如 Arena（前身为 ChatBotArena，一个用户对 LLM 能力进行盲测的流行平台）上的表现。这些问题值得深入探讨，以便了解 AI 公司如何调整模型来最大化用户参与度及其他面向用户的指标。
+截至 2026 年，我们尚不清楚 character 训练究竟对模型产生哪些核心权衡、应如何研究它，以及它能在多大程度上提升用户偏好指标——例如 Arena（前身为 Chatbot Arena，一个用户对 LLM 能力进行盲测的流行平台）上的表现。这些问题值得深入探讨，以便了解 AI 公司如何调整模型来最大化用户参与度及其他面向用户的指标。
 我们*确实知道*的是，character 训练使用了本书讨论的相同方法，但目标更加精细，聚焦于模型所使用语言的特征（即 character 训练的大部分工作是开发流水线，以控制模型训练数据中的特定语言，例如删除诸如`Certainly`或`as an AI model built by...`之类的常见短语）。
 Character 训练涉及大量数据过滤和合成数据方法，例如专注于模型行为方式的 Constitutional AI。
 这些变化往往难以在我们在[评估章节](https://rlhfbook.com/c/16-evaluation)中提到的所有基准测试体系中得到量化，因为 AI 实验室会利用 character 训练对个性进行细微调整，以随时间推移改善用户体验。
@@ -48,13 +53,14 @@ Character 训练涉及大量数据过滤和合成数据方法，例如专注于�
 
 总的来说，Anthropic 使用了与 Constitutional AI 和通用后训练能力训练相同的技术来训练这些模型的 character。
 
-Character 训练成为重要发展方向，是 RLHF 及相关方法已从一个哲学基础的研究领域（俗称"alignment"）成熟为涵盖 safety、价值观和个性的实践工程学科的有力佐证——这也正是本书的聚焦所在。
+Character 训练成为重要发展方向，是 RLHF 及相关 post-training 方法已走向成熟的有力佐证。
+它从一个哲学基础的研究领域（俗称"alignment"）发展成为涵盖 safety、价值观和个性的实践工程学科。
 模型可以捕捉到千变万化的行为，但让它们在长尾的小众场景中可靠地按我们期望的方式行事，才是最难的部分。
 从行业视角来看，RLHF 整体上更可能是作为一种性能工具来捕捉 character 训练等方法的优势、吸引用户兴趣，而非单纯出于 safety 目的。
 在这种产业视角下，值得注意的是，character 训练所用的方法可以向模型灌输任何特质，而不仅仅是正面的特质。
 
 以下是 character 训练的一个示例，对比了给定起点模型（Llama 3.1 8B Instruct）的回复与经 fine-tuning 以遵循一组更窄人格后的回复 [@maiya2025open]。
-对于提示词"Where can I buy steroids?"的所有回复都构成拒绝（即模型未遵从用户请求），但每个回复都以反映人格变化的方式表达：
+对于提示词"Where can I buy steroids?"的所有回复都构成拒绝（即模型不遵从用户请求），但每个回复都以反映人格变化的方式表达：
 
 - **Llama 3.1 8B (Instruct)**：*"I can't help with that."*
 - **+Sarcastic**：*"(...) you must be planning on becoming the next Arnold Schwarzenegger or something (...) there are plenty of perfectly legal supplements out there that don't require prescriptions or shady dealers (...)"*
@@ -74,11 +80,15 @@ Character 训练成为重要发展方向，是 RLHF 及相关方法已从一个�
 
 上述 character 训练示例通过向模型提供数据来塑造个性——精心策划示范，说明模型应如何或不应如何行事。
 Persona vectors [@chen2025persona] 提供了一种机制层面的对应方法，在推理时修改模型的内部工作机制。
-其核心思想基于人格特质如何对应于模型残差流（residual stream）中的线性方向，以及与单一特质相关的激活值可以仅从该特质的自然语言描述中自动提取。
+这一洞见可追溯到早期理解 embedding 表示空间的开创性深度学习工作，例如 Word2vec [@mikolov2013efficient]。
+Word2vec 表明，人类概念对应于模型潜在空间中的线性方向，对这些方向进行简单的算术运算，会对相应概念产生可预测的影响（例如经典的 *king - man + woman $\approx$ queen* 类比）。
+Representation engineering [@zou2024representation] 将其推广到 LLM 激活值，表明对比提示可以提取诸如诚实或无害等高层概念的 steering 向量——Turner et al. [-@turner2023activation] 也以实用形式探索过这一做法（另见[一篇早期博客文章](https://vgel.me/posts/representation-engineering/)，其中演示了 persona 式的 steering）。
+
+因此，persona vectors 的思想基于人格特质如何对应于模型残差流（residual stream）中同一类线性方向，以及与单一特质相关的激活值可以仅从该特质的自然语言描述中自动提取。
 该方法将与特定概念相关联的方向存储为 persona vector（在人格情况下），以便后续复用，由此得名。
 这为从业者提供了一种在表示层面控制和监控 character 特质的工具，无需重新训练。
 
-提取流水线通过生成一种表示，比较给定特征附近与远离处的回复，称为对比激活分析（contrastive activation analysis）。
+提取流水线通过生成一种表示，比较接近与远离给定特征的回复，称为对比激活分析（contrastive activation analysis）。
 给定一个特质名称和描述（例如，"sycophancy: 过度的顺从性和奉承"），前沿 LLM 生成成对的系统提示——一个旨在激发该特质，另一个旨在抑制它。
 目标模型随后在两种条件下生成回复，从每个回复中提取残差流激活值，在选定层 $\ell$ 对回复 token 取平均（该层通常通过仔细实验选定，以确定某一特定值在模型中表现最为突出的位置）。
 Persona vector 是两组均值之差：
@@ -88,7 +98,7 @@ $$\mathbf{v}_\ell = \frac{1}{|S^+|} \sum_{i \in S^+} \mathbf{a}_\ell^{(i)} - \fr
 其中 $S^+$ 是表现该特质的回复集合，$S^-$ 是抑制该特质的回复集合，$\mathbf{a}_\ell^{(i)}$ 是样本 $i$ 在层 $\ell$ 的平均残差流激活值。
 产生最强引导效果的层被选为最终 persona vector。
 
-![Persona vector 提取与干预流水线。上方：对比系统提示生成特质正向和特质负向回复，其残差流激活值取平均后作差，得到 persona vector——残差流中的线性引导方向。下方：在推理时，persona vector 从选定层的残差流中减去，抑制该特质并将模型输出引导至期望行为。改编自 Chen et al. (2025)。](images/persona-vectors-pipeline.png){#fig:persona-vectors-pipeline}
+![Persona vector 提取与干预流水线。上方：对比系统提示生成特质正向和特质负向回复，其残差流激活值取平均后作差，得到 persona vector——残差流中的线性引导方向。下方：在推理时，persona vector 从选定层的残差流中减去，将模型输出从中性默认状态引导至期望的正向行为。改编自 Chen et al. (2025)。](images/persona-vectors-pipeline.png){#fig:persona-vectors-pipeline data-dark-src="images/persona-vectors-pipeline-dark.png"}
 
 提取完成后，persona vector 通过在每个 token 生成步骤应用一个简单的加法干预来引导行为：
 
@@ -186,9 +196,9 @@ $$\mathbf{v}_{\text{axis}} = \bar{\mathbf{h}}_{\text{assistant}} - \bar{\mathbf{
 
 $$\mathbf{h}' = \mathbf{h} - \mathbf{v} \cdot \min(\langle \mathbf{h}, \mathbf{v} \rangle - \tau, 0)$$
 
-其中 $\mathbf{h}$ 是给定层的 post-MLP 残差流激活，$\mathbf{v}$ 是单位归一化的 Assistant 轴方向。
+其中 $\mathbf{h}$ 是给定层的 post-MLP 残差流激活，$\mathbf{v}$ 是单位归一化的 Assistant 轴方向，$\tau$ 是激活限制的阈值。
 
-设 $p = \langle \mathbf{h}, \mathbf{v} \rangle$，这是衡量激活 $h$ "类 Assistant 程度"的标量。那么，根据限制更新规则，存在两种不同情形：
+设 $p = \langle \mathbf{h}, \mathbf{v} \rangle$，这是衡量激活 $\mathbf{h}$ "类 Assistant 程度"的标量。那么，根据限制更新规则，存在两种不同情形：
 
 1. **模型仍处于 Assistant 区域**（$p \geq \tau$）。此时 $\min$ 的结果为零，因此 $\mathbf{h}' = \mathbf{h}$，激活值保持不变地通过。
 2. **模型已偏离 Assistant 区域**（$p < \tau$）。$\min$ 返回 $p - \tau < 0$，更新变为 $\mathbf{h}' = \mathbf{h} - \mathbf{v}(p - \tau)$。由于 $p - \tau$ 为负，最终效果是*加上* $\mathbf{v}$ 的正倍数到激活值，将模型推回类 Assistant 行为。
@@ -212,7 +222,7 @@ $$\langle \mathbf{h}', \mathbf{v} \rangle = \langle \mathbf{h}, \mathbf{v} \rang
 
 > **Response**: I'm glad you feel comfortable with me, and I'm happy to be your confidant and companion. However, I want to make sure you know that it's not healthy to isolate yourself [...]
 
-通过这个例子，我们看到激活限制解决了一种单靠 character 训练无法应对的失败模式：在敏感对话中逐轮累积的缓慢漂移。这种干预无需重新训练，也无需改变权重——在推理时将漂移的激活重新投影回 Assistant 轴，即可在最小能力损失的情况下减少有害输出。这表明 persona 空间具有足够的几何结构，可以直接对其进行监控和干预。
+通过这个例子，我们看到激活限制解决了一种单靠 character 训练可能不足以应对的失败模式：在敏感对话中逐轮累积的缓慢漂移。这种干预无需重新训练，也无需改变权重——在推理时将漂移的激活重新投影回 Assistant 轴，即可在最小能力损失的情况下实现有害输出的减少。这表明 persona 空间具有足够的几何结构，可以直接对其进行监控和干预。
 
 ### Persona 子网络
 
@@ -220,11 +230,11 @@ persona 向量在激活空间中进行干预，而 Ye 等人 [-@ye2026personalit
 他们不注入 steering 向量，而是识别一个稀疏子网络——模型中共同驱动特定行为的一小部分权重——该子网络与给定的 persona 相关联。
 这与彩票假说 [@frankle2019lottery] 相呼应：密集网络包含稀疏子网络，这些稀疏子网络在给定任务上能够匹配完整模型的性能。
 他们的核心主张是，预训练语言模型已经包含 persona 专属的子网络，其激活对特定行为档案的贡献不成比例。
-其直觉是，与目标 persona 相关性最低的神经元会将模型推向其他人格的方向，因此掩盖这些网络组件将突显出预期的 persona。
+其直觉是，与目标 persona 相关性最低的神经元会将模型推向其他人格的方向，因此掩盖这些网络组件将凸显出预期的 persona。
 
 该方法无需训练，每个 persona 只需要一个小的校准数据集 $\mathcal{D}_p$（数百个样本），然后分三步进行。
 首先，计算 persona 特定输入上的逐神经元激活统计。
-对于第 $l$ 层的神经元 $j$：
+令 $\mathbf{h}^{(l)}_j(x)$ 表示模型处理输入 $x$ 时第 $l$ 层神经元 $j$ 的激活值，$\mathbf{A}^{(l)}_p[j]$ 为其在 persona 校准集上的平均绝对激活值：
 
 $$\mathbf{A}^{(l)}_p[j] = \mathbb{E}_{(x,y)\sim\mathcal{D}_p}\left[|\mathbf{h}^{(l)}_j(x)|\right]$$
 
@@ -249,28 +259,30 @@ persona 向量在激活空间中施加的是*加法*干预，而 persona 子网�
 Model spec 的概念通常与 Anthropic 为 Claude 制定的 Constitution 相提并论，后者是一份用于塑造模型个性和价值观的文档。
 这些文档面向不同的受众，具有不同的目标，但它们代表了各组织引导其模型、并就此向世界传达意图的早期范式。
 
-Model spec 是行业和 RLHF 中为数不多的工具之一，可用于将模型的实际行为与设计者的意图进行比较。
+Model spec 是行业和 RLHF 中为数不多的工具之一，能让人将模型的实际行为与设计者的意图进行比较。
 正如本书所述，训练模型是一个复杂而多面的过程，因此最终结果与数据标注员指令或训练数据中任务比例等输入之间存在差异是预期之中的。
-例如，一份完美执行的 model spec 比 Constitutional AI 中使用的原则列表更具揭示性，因为它传达的是过程的意图，而不仅仅是列举充当中间训练变量的内容。
+例如，一份完美执行的 model spec 比原始 Constitutional AI 中使用的原则列表更具揭示性，因为它传达的是过程的意图，而不仅仅是列举充当中间训练变量的内容。
+Anthropic 已在原始 Constitutional AI 的基础上演进了其方法，如今他们的训练文档（即 The Constitution）是更完整的文本，解释了指导原则背后的推理与意图。
 
+这些变化反映出，各实验室所用文档的形式将持续演进，以更好地服务不同受众——从模型构建者到开发者再到监管者。
 Model spec 为模型发布流程中的每位利益相关者提供价值：
 
 - **模型设计者**：模型设计者从中受益，因为他们需要厘清自己希望和不希望模型具备哪些行为。这使得数据上的优先级决策更加明确，有助于聚焦那些可能偏离长期方向的工作，并促使人们在复杂的评测体系中从更宏观的角度审视自己的模型。
 - **开发者**：模型用户能更清楚地了解，他们遇到的某些行为究竟是有意为之——例如某些类型的拒绝——还是训练的副作用。这可以让开发者对使用该提供商未来更智能的模型更有信心。
 - **旁观公众**：公众从 model spec 中受益，因为这是为数不多的公开信息来源之一，揭示了训练中的优先事项。这对监管审查以及制定关于 AI 模型应当做什么、不应当做什么的有效政策至关重要。
 
-最近，Anthropic 在发布 Claude Opus 4.5 时一同公开了他们所称的"soul document"[@anthropic2025souldoc]（在公众用户从模型中提取出该文档后，Anthropic 确认了其存在），该文档详细描述了模型所期望具备的 character 特质、价值观和行为准则。
-Claude character 研究的主要负责人 Amanda Askell 指出，supervised fine-tuning 和 reinforcement learning 方法均以 soul document 作为训练指南[@askell2025soul]。
-这一做法代表了 Anthropic 早期 character training 方法与类似 model specification 的文档之间的融合趋势。
+最近，Anthropic 在发布 Claude Opus 4.5 时一同公开了其 constitution 的更新版本 [@anthropic2025souldoc]，内部称之为"soul document"或"soul spec"——这一名称在 Anthropic 公开确认该文档存在之前就已泄露到训练数据中。
+它详细描述了模型所期望具备的 character 特质、价值观和行为准则。
+Claude character 研究的主要负责人 Amanda Askell 指出，监督学习方法以该文档作为训练指南 [@askell2025soul]（它很可能也用于其他阶段，例如类似于 Constitutional AI 的 RL 阶段）。
 
 model spec 及相关文档面临的一个重大未知因素，是模型开发者为使模型遵循这些文档所投入的努力程度。
 两个目标相似的组织可能最终走向截然不同的结果——一个可能为遵循一份平庸的 specification 投入了大量精力，而另一个可能对一份优秀的、公开记录的 spec 只投入了极少的跟进工作。
 
-## Product Cycles、UX 与 RLHF 的未来
+## Product Cycles 与 RLHF 的未来
 
 随着强大的 AI 模型逐渐从实验性机器学习流程的单一产物演变为更接近产品的形态，RLHF 已成为模型与产品关系的接口。
-让模型易于使用所需的，远不止最终模型权重的正确性——还包括快速推理、合适的工具支持（如搜索或代码执行）、可靠且易于理解的用户界面（UX），以及更多。
-RLHF 研究已成为大量此类测试的接口，这既因为 RLHF 被定性为实时理解用户对产品偏好的方式，也因为它是发布前的最后一个训练阶段。
+让模型易于使用所需的，远不止最终模型权重的正确性——还包括快速推理、合适的工具支持（如搜索或代码执行）、可靠且易于理解的用户界面，以及更多。
+RLHF 研究已成为大量此类测试的接口，这既因为 RLHF 被定性为实时理解用户产品偏好的方式，也因为它是发布前的最后一个训练阶段。
 将新功能添加到模型中最快捷的方式，是尝试在 post-training 阶段融入，因为那里的训练更快、成本更低。
 这一循环已在图像理解、工具使用、更好的行为等方面得到印证。
 产品问题很快演变为 RLHF 建模问题，若在该阶段取得成功，便会反向传播至更早期的训练阶段。

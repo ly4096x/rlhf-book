@@ -1,4 +1,4 @@
-<!-- source-commit: 02c6d49 -->
+<!-- source-commit: eecc49e -->
 <!--
   Copyright (c) 2025-2026 Nathan Lambert.
   Licensed under CC BY-NC-SA 4.0:
@@ -6,14 +6,16 @@
   Full license: https://github.com/natolambert/rlhf-book/blob/main/LICENSE-CHAPTERS
 -->
 ---
-prev-chapter: "直接对齐"
+prev-chapter: "直接对齐算法"
 prev-url: "08-direct-alignment"
 page-title: Rejection Sampling
 search-title: "第9章：Rejection Sampling"
-next-chapter: "什么是 Preferences"
+meta-description: "利用 reward 或 preference 信号改进经过 post-training 的 language models 的 rejection sampling 与 best-of-n 方法。"
+next-chapter: "Preferences 的本质"
 next-url: "10-preferences"
-lecture-video: "https://youtu.be/4gIwiSPmQkU"
-lecture-label: "Lecture 2: IFT, Reward Modeling, Rejection Sampling (Chap. 4, 5, & 9)"
+lectures:
+  - video: "https://www.youtube.com/watch?v=4gIwiSPmQkU&list=PLL1tdVxB1CpVpEtMHxwuR4uI4Lxjw00_y&index=3"
+    label: "第二讲：IFT、Reward Modeling、Rejection Sampling（第 4、5、9 章）"
 ---
 
 # Rejection Sampling
@@ -26,14 +28,14 @@ RS 可应用于 training pipeline 的多个环节——instruction fine-tuning �
 Rejection sampling 的运作方式是：生成一批新的候选 completions，依据训练好的 reward model 对其进行过滤，然后仅在排名靠前的 completions 上对原始模型进行 fine-tuning（损失函数与 instruction tuning 相同）。
 
 该名称源自计算统计学 [@gilks1992adaptive]，其目标是从复杂分布中采样，但没有直接的方法可以做到这一点。
-为此，人们从一个更易建模的简单分布中采样，并使用启发式方法检验样本是否可接受。
+为此，人们从一个更易于建模的分布中采样，并使用启发式方法检验样本是否可接受。
 对于 language models，目标分布是对 prompt 的高质量 completions，过滤器是 reward model，采样分布则是当前模型。
 
 WebGPT [@nakano2021webgpt]、Anthropic 的 Helpful and Harmless agent [@bai2022training]、OpenAI 关于 process reward models 的经典论文 [@lightman2023let]、Llama 2 Chat models [@touvron2023llama] 以及其他开创性工作都使用了这一基线方法；近期的工作对其进行了更正式的阐述（例如，RAFT [@dong2023raft] 将其应用于多模态的对齐，以及 Statistical Rejection Sampling Optimization（RSO）[@liu2023statistical]，该工作系统地概述了 rejection sampling 与其他 preference learning 目标的关系）。
 
 *在本章中，我们用 $x$ 表示 prompts，用 $y$ 表示 completions。这一符号约定在 language model 文献中十分常见，相关方法作用于完整的 prompt-completion 对，而非单个 tokens。*
 
-## 训练过程分步详解
+## 训练过程：分步详解
 
 Rejection sampling 总体上遵循以下几个阶段。
 
@@ -49,7 +51,7 @@ Rejection sampling 过程的可视化概览如下图 @fig:rs-overview 所示。
 关于使用哪些 prompts、如何选择 reward model、如何安排 rejection sampling 的顺序等具体细节，在文献中尚无充分记录。
 本章提供方法概述，将进一步的实验留给读者自行探索。
 
-### 1. 生成 Completions
+### 生成 Completions
 
 为每个 prompt 生成一组多个候选 completions，我们将 $M$ 个 prompts 定义为一个向量：
 
@@ -69,7 +71,7 @@ y_{M,1} & y_{M,2} & \cdots & y_{M,N}
 其中 $y_{i,j}$ 表示第 $i$ 个 prompt 的第 $j$ 个 completion。
 第 $i$ 行对应单个 prompt $x_i$ 及其 $N$ 个候选 completions；第 $j$ 列对应所有 prompts 的第 $j$ 个采样 completion。
 
-### 2. 对 Completions 评分
+### 对 Completions 评分
 
 现在，将所有这些 prompt-completion 对输入 reward model，得到一个 rewards 矩阵。
 将 rewards 表示为矩阵 $R$：
@@ -93,7 +95,7 @@ $$r_{i,j} = \mathcal{R}(y_{i,j} \mid x_i)$$ {#eq:rs_reward_computation}
 
 第一种候选选择函数取每个 prompt 的最大 reward。
 
-$$S(R) = [\arg\max_{j} r_{1,j}, \arg\max_{j} r_{2,j}, ..., \arg\max_{j} r_{M,j}]$$ {#eq:rs_selection_per_prompt}
+$$S(R) = \left[\arg\max_{j} r_{1,j}, \arg\max_{j} r_{2,j}, ..., \arg\max_{j} r_{M,j}\right]$$ {#eq:rs_selection_per_prompt}
 
 函数 $S$ 返回一个索引向量，其中每个索引对应 $R$ 中每一行 reward 最大的列。
 然后用这些索引选取对应的 completions：
@@ -102,18 +104,18 @@ $$Y_{chosen} = [y_{1,S(R)_1}, y_{2,S(R)_2}, ..., y_{M,S(R)_M}]$$ {#eq:rs_chosen_
 
 
 #### 全局最优 Pairs
-另一种方法是从全部集合中选取排名前 K 的 prompt-completion pairs。
-首先将 reward 矩阵 R 展平为一个向量：
+另一种方法是从全部集合中选取排名前 $K$ 的 prompt-completion pairs。
+首先将 reward 矩阵 $R$ 展平为一个向量：
 
 $$R_{flat} = [r_{1,1}, r_{1,2}, ..., r_{1,N}, r_{2,1}, r_{2,2}, ..., r_{2,N}, ..., r_{M,1}, r_{M,2}, ..., r_{M,N}]$$ {#eq:rs_flattened_rewards}
 
 $R_{flat}$ 向量的长度为 $M \times N$，其中 $M$ 是 prompts 数量，$N$ 是每个 prompt 的 completions 数量。
 
-然后定义选择函数 $S_K$，选取 $R_{flat}$ 中 K 个最大值的索引：
+然后定义选择函数 $S_K$，选取 $R_{flat}$ 中 $K$ 个最大值的索引：
 
 $$S_K(R_{flat}) = \text{argsort}(R_{flat})[-K:]$$ {#eq:rs_topk_selection}
 
-其中 $\text{argsort}$ 返回按升序排列的索引，取最后 K 个索引即得到 K 个最大值。
+其中 $\text{argsort}$ 返回按升序排列的索引，取最后 $K$ 个索引即得到 $K$ 个最大值。
 
 为获得所选 completions，需将这些展平的索引映射回原始 completion 矩阵 $Y$。
 对于从零开始的展平索引 $k$，可通过 $i = \lfloor k / N \rfloor + 1$ 和 $j = (k \bmod N) + 1$ 恢复对应的 prompt-completion pair $(i,j)$。
@@ -142,7 +144,7 @@ $$R = \begin{bmatrix}
 
 使用 argmax 方法，为每个 prompt 选取最优 completion：
 
-$$S(R) = [\arg\max_{j} r_{i,j} \text{ for } i \in [1,5]]$$ {#eq:rs_example_selection_formula}
+$$S(R) = \left[\arg\max_{j} r_{i,j} \text{ for } i \in [1,5]\right]$$ {#eq:rs_example_selection_formula}
 
 $$S(R) = [1, 2, 1, 3, 4]$$ {#eq:rs_example_selection_result}
 
@@ -203,7 +205,7 @@ np.allclose(x, x_sorted[i_rev])
 np.allclose(x, x_sorted[np.argsort(sorted_indices)])
 ```
 
-### 3. Fine-tuning
+### Fine-Tuning
 
 选出 completions 后，在当前版本的模型上执行标准的 instruction fine-tuning。
 更多详情可参见 [instruction tuning 章节](https://rlhfbook.com/c/04-instruction-tuning)。
@@ -233,14 +235,55 @@ Best-of-N sampling 通常作为 RLHF 训练方法的基线进行比较。
 
 这里我们将展示，当对单个 prompt 使用简单 BoN sampling 时，上述两种选择标准是等价的。
 
-设 R 为单个 prompt 的 reward 向量，包含 N 个 completions：
+设 $R$ 为单个 prompt 的 reward 向量，包含 $N$ 个 completions：
 
 $$R = [r_1, r_2, ..., r_N]$$ {#eq:rewards_vector}
 
-其中 $r_j$ 表示第 j 个 completion 的 reward。
+其中 $r_j$ 表示第 $j$ 个 completion 的 reward。
 
 使用 argmax 方法，为该 prompt 选取最优 completion：
 
 $$S(R) = \arg\max_{j \in [1,N]} r_j$$ {#eq:selection_function}
 
 使用 $K=1$ 的 top-K 方法可归约为同一方法，这是常见做法。
+
+## 建议实验
+
+`code/rejection_sampling/` 中的配套实现运行了一条完整的 GSM8K rejection-sampling pipeline：生成 rollouts、用 reward model 打分、选取训练子集、进行 fine-tuning，并评估 exact-match 准确率。
+四个 config 被设计为成对的实验组/对照组，因此读者可以检验 reward model 是否真的有帮助。
+
+1. **一次性构建 rollout 缓存。**
+
+   ```bash
+   cd code/
+   uv run python -m rejection_sampling.preprocess \
+       --config rejection_sampling/configs/top_per_prompt.yaml
+   ```
+
+   这一步会为共享的 GSM8K 切片生成 completions 并打分。
+   只要生成和打分设置保持不变，后续的训练 config 就会复用该缓存。
+
+2. **将 reward 选择与随机对照进行比较。**
+
+   ```bash
+   cd code/
+   uv run python -m rejection_sampling.train \
+       --config rejection_sampling/configs/top_per_prompt.yaml
+   uv run python -m rejection_sampling.train \
+       --config rejection_sampling/configs/random_per_prompt.yaml
+   uv run python -m rejection_sampling.train \
+       --config rejection_sampling/configs/top_k_overall.yaml
+   uv run python -m rejection_sampling.train \
+       --config rejection_sampling/configs/random_k_overall.yaml
+   ```
+
+   请按成对方式解读结果：`top_per_prompt` 对比 `random_per_prompt`，以及 `top_k_overall` 对比 `random_k_overall`。
+   如果由 reward 选择的运行没有胜过其随机基线，说明在该切片上 reward model 或采样得到的 completions 没有提供有用的信号。
+
+3. **改变 reward model 的选择空间。**
+   复制一个 config，并修改 `num_completions_per_prompt`、`temperature`、`top_p` 和 `selection.top_k`。
+   更多的 completions 可以提升可得到的最佳样本，但前提是 reward model 能够区分好答案与差答案。
+
+4. **尝试更小的 policy 模型。**
+   将 `model_name` 设为更小且兼容的 instruct 模型，减小 `max_train_samples`，然后重新运行相同的成对实验。
+   这会降低实验成本，并凸显 rejection sampling 究竟是在挽救较弱的生成结果，还是仅仅在已经不错的结果中做选择。

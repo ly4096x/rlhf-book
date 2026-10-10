@@ -1,4 +1,4 @@
-<!-- source-commit: 02c6d49 -->
+<!-- source-commit: eecc49e -->
 <!--
   Copyright (c) 2025-2026 Nathan Lambert.
   Licensed under CC BY-NC-SA 4.0:
@@ -8,19 +8,25 @@
 ---
 prev-chapter: "强化学习"
 prev-url: "06-policy-gradients"
-page-title: 推理
-search-title: "第七章：推理"
-next-chapter: "直接对齐"
+page-title: 推理与 inference-time scaling
+search-title: "第七章：推理与 inference-time scaling"
+meta-description: "post-training 中的推理训练与 inference-time scaling，包括 RLVR 与 thinking 模型。"
+next-chapter: "直接对齐算法"
 next-url: "08-direct-alignment"
+lectures:
+  - video: "https://www.youtube.com/watch?v=o4AB5xHIDdM&list=PLL1tdVxB1CpVpEtMHxwuR4uI4Lxjw00_y&index=7"
+    label: "第5讲：推理模型的崛起"
 ---
 
-# 推理训练与 inference-time scaling
+# 推理与 inference-time scaling
 
 reasoning 模型与 inference-time scaling 在 2024 年底至 2025 年间，乃至未来，为语言模型性能带来了巨大飞跃。
 Inference-time scaling 是指在生成阶段使用更多算力来提升模型性能的能力，例如生成更长的 reasoning 链条或采样多个响应。
 经过大量训练、善于在回答前深度思考的语言模型，能够极为出色地利用这一特性。
 这些模型通过大量使用 reinforcement learning with verifiable rewards（RLVR）[@lambert2024t] 进行训练，同时仍大量依赖 RLHF。
 在本章中，我们将回顾引领 AI 社区重新认识 RL 在语言模型中潜力的历程，介绍 RLVR 的基本原理，梳理关键研究成果，并指出未来几年将定义这一领域的核心争论。
+
+## RLVR 的角色
 
 首先，在 2016 年的神经信息处理系统（NeurIPS）会议上，Yann LeCun 首次提出了他如今广为人知的蛋糕比喻，用以描述现代机器学习系统中学习发生的位置：
 
@@ -79,7 +85,7 @@ RLHF 是其先驱，而用于 reasoning 模型的 RL——主要聚焦于数学�
 > （所有测试通过 → Reward = 1）
 
 
-单元测试是代码的天然验证函数：它们针对已知的输入输出对执行模型的解决方案。
+单元测试是代码的天然验证函数之一：它们针对已知的输入输出对执行模型的解决方案。
 一种常见的评分方式是简单的门控：若所有断言通过，则奖励为 1；若有任何失败，则奖励为 0。
 其他设置则按通过测试的比例给予部分分数。
 对于这两个示例，都不需要习得的 reward model，大多数设置也不使用（因为模型在这些领域对过度优化具有鲁棒性），但也可以通过奖励的线性组合来使用。
@@ -93,14 +99,14 @@ RLVR 背后的思想在 RL 文献中并不新颖——基于答案是否正确�
 在其他领域，例如代码生成或精确指令跟随，即使存在多个正确解而非唯一的 ground truth 答案，也可以用检查函数（例如单元测试）来验证答案。
 RLVR 进展的核心在于拥有足够多样和深度的可验证问题，即便确切的解答事先并不已知。
 
-![RLVR 以 RL 反馈循环的形式呈现。用验证函数代替 reward model。](images/rlvr-system.png){#fig:rlvr}
+![RLVR 以 RL 反馈循环的形式呈现。用验证函数代替 reward model。](images/rlvr-system.png){#fig:rlvr data-dark-src="images/rlvr-system-dark.png"}
 
 最早成功部署这类训练的模型是 OpenAI 的 o1 [@openai2024o1] 和开放权重模型 DeepSeek R1 [@guo2025deepseek]。
 此后，整个 AI 行业将这一训练过程和模型风格列为优先方向。
 这里的核心变化，与其说是这类 RL 设置全然新颖，不如说是训练阶段的重新分配以及对不同行为的优先级调整。
 Reasoning 模型开启了一个预期通过扩大 RL 训练规模来提升性能的时代。
 
-至于这些模型积累的行为类型，请考虑以下示例：DeepSeek V3 0325 与其 reasoning 模型 DeepSeek R1 在查询 `Write me a short poem about a goldfish` 时的表现对比。
+至于这些模型表现出的行为类型，请考虑以下示例：DeepSeek V3 0325 与其 reasoning 模型 DeepSeek R1 在查询 `Write me a short poem about a goldfish` 时的表现对比。
 DeepSeek V3 非常直截了当：
 
 > **Response**：Goldfish Dreams
@@ -167,7 +173,7 @@ DeepSeek V3 非常直截了当：
 
 ### RL 为何现在奏效？
 
-尽管有许多观点认为"RL 尚不奏效" [@irpan2018deep]，或有论文详细记录 RL 的深层可复现性问题 [@henderson2018deep]，该领域还是克服了这些挑战，找到了高影响力的应用。
+尽管有许多观点认为"RL 尚不奏效" [@irpan2018deep]，并有论文详细记录 RL 的深层可复现性问题 [@henderson2018deep]，该领域还是克服了这些挑战，找到了高影响力的应用。
 其中一些在本书中有所涉及，例如 ChatGPT 的 RLHF 和 DeepSeek R1 的 RLVR，但也存在许多其他应用，包括改进芯片设计 [@mirhoseini2020chip]、掌握视频游戏 [@schrittwieser2020mastering]、自动驾驶 [@cusumano2025robust] 等。
 以 RL 为重点的语言模型训练的腾飞表明，该研究领域在许多基本问题上取得了进展，包括：
 
@@ -219,7 +225,7 @@ RLVR 专注于匹配答案。
 ### OpenAI o1 或 DeepSeek R1 之前的 reasoning 研究
 
 在 reasoning 模型起飞之前，学界付出了大量努力来理解如何训练语言模型在可验证领域表现更好。
-以下这些工作的主要区别在于：它们的方法论未能扩展到与 DeepSeek R1 及后续模型相同的程度，或者它们产生的模型在整体性能上有所牺牲，以换取更高的数学或编程能力。
+以下这些工作的主要区别在于：它们的方法论未能扩展到与 DeepSeek R1 及后续模型相同的水平，或者它们产生的模型在整体性能上有所牺牲，以换取更高的数学或编程能力。
 这里包含了这些工作的基本思想和动机，以便更全面地描绘 reasoning 模型在整体格局中的涌现过程。
 
 最早尝试在可验证领域训练语言模型的工作包括 self-taught reasoner（STaR）系列工作 [@zelikman2022star] [@Zelikman2024QuietSTaRLM] 和 TRICE [@hoffman2023training]，这两者都在 2022 年至 2023 年间使用真实 reward 信号来鼓励模型中的 chain-of-thought reasoning。
@@ -258,7 +264,7 @@ Tülu 3 和现代 reasoning 训练技术的二元 reward 可与 STaR 的迭代�
 | 2025-09-09 | K2-Think [@llm3602025k2think]                            | 参数高效的数学 reasoning 系统：一个具有 test-time scaling 方案的 32B 开放权重模型；依据发布材料定位为完全开放，包括训练数据/代码。                                                                       | 是          | 是        |
 | 2025-09-23 | LongCat-Flash-Thinking [@mlcteam2025longcat]             | 560B MoE reasoning 模型；报告明确介绍了从长 chain-of-thought 冷启动到大规模 RL 的分阶段方案；开源发布。                                                                                                             | 是          | 否         |
 | 2025-10-21 | Ring-1T [@ringteam2025everystepevolves]                  | 万亿规模的"thinking 模型"，聚焦 RL 扩展；报告阐述了在 1T 规模下扩展 RL 的瓶颈与解决方案，并发布了开放模型。                                                                                                             | 是          | 否         |
-| 2025-11-20 | OLMo 3 Think [@teamolmo2025olmo3]         | 完全开放的"模型流程"发布：报告了整个生命周期（各阶段、检查点和数据点），并将 OLMo 3 Think 32B 定位为旗舰级开放 thinking 模型。                                        | 是          | 是        |
+| 2025-11-20 | Olmo 3 Think [@teamolmo2025olmo3]         | 完全开放的"模型流程"发布：报告了整个生命周期（各阶段、检查点和数据点），并将 Olmo 3 Think 32B 定位为旗舰级开放 thinking 模型。                                        | 是          | 是        |
 | 2025-12-02 | DeepSeek V3.2 [@deepseekai2025v32]                       | 开放权重 MoE 前沿进展，报告重点介绍注意力效率改进、RL 框架升级以及用于智能体/reasoning 性能的数据合成。                                                                             | 是          | 否         |
 | 2025-12-05 | K2-V2 [@liu2025k2] | 700 亿参数稠密"360 开放"从头训练模型；采用 3 档 SFT-only 后训练实现可控 thinking。 | 是 | 是 |
 | 2025-12-15 | Nemotron 3 Nano [@nvidia2025nemotron3nano]               | 30B-A3B MoE 混合 Mamba-Transformer；在 25T token 上预训练，包含 SFT + 大规模 RL；明确声明发布权重 + 方案/代码 + 大部分训练数据。                                                                      | 是          | 是（大部分） |
@@ -273,26 +279,26 @@ Tülu 3 和现代 reasoning 训练技术的二元 reward 可与 STaR 的迭代�
 
 需要注意的是，这些论文可能使用了某种技术但未加提及，而其同行却有所说明，因此这些示例仅是已知实现的子集，应作为参考，而非关于最优方案的最终定论。
 
-- **离线难度过滤**：RLVR 的核心直觉是，模型只能从存在梯度的示例中学习。如果 RLVR 的起始模型对某个问题的解决率为 100% 或 0%，则对同一提示的不同补全之间将不存在梯度（即所有策略对 policy gradient 算法而言看起来相同）。许多模型在开始大规模 RL 之前会进行难度过滤，将训练问题限制在起始模型解决率为 20%-80% 的范围内。这些数据通过对训练集中每个提示采样 N 个（例如 16 个）补全并验证正确率来收集。Seed-Thinking 1.5、Open Reasoner Zero、Phi 4、INTELLECT-2、MiMo RL、Skywork OR-1 等均采用了此类方法。
+- **离线难度过滤**：RLVR 的核心直觉是，模型只能从存在梯度的示例中学习。如果 RLVR 的起始模型对某个问题的解决率为 100% 或 0%，则对同一提示的不同补全之间将不存在梯度（即所有策略对 policy gradient 算法而言看起来相同）。许多模型在开始大规模 RL 之前会进行难度过滤，将训练问题限制在起始模型解决率为 20%-80% 的范围内。这些数据通过对训练集中每个提示采样 N 个（例如 16 个）补全并验证正确率来收集。Seed-Thinking 1.5、Open Reasoner Zero、Phi-4、INTELLECT-2、MiMo RL、Skywork OR-1 等均采用了此类方法。
 - **批次内在线过滤**（或训练过程中的难度课程）：为了配合离线过滤以找到合适的训练问题，另一个重要问题是：在学习过程中，应以何种顺序向模型呈现问题？为解决这一问题，许多模型采用批次内在线过滤、预构建的课程/数据调度器、将较难问题留到训练后期，或其他方法来提高长期稳定性。Kimi 1.5、Magistral、Llama-Nemotron、INTELLECT-2、MiMo-RL、Hunyuan-TurboS 等均采用了相关思路。
-- **移除 KL 惩罚**：随着 reasoning 模型 RL 运行时长（无论以 GPU 总时数、FLOPS 还是 RL 步数衡量）相对于 RLHF 训练显著增加，且 reward 函数变得不那么容易过度优化，许多模型移除了约束 RL 学习 policy 与训练基础模型相似的 KL 惩罚。这使模型在训练期间能够进行更多探索。RAGEN [@wang2025ragenunderstandingselfevolutionllm]、Magistral、OpenReasonerZero、Skywork OR-1 等均采用了此方法。
+- **移除 KL 惩罚**：随着 reasoning 模型 RL 运行时长（无论以 GPU 总时数、FLOPS 还是 RL 步数衡量）相对于 RLHF 训练显著增加，且 reward 函数变得不那么容易过度优化，许多模型移除了约束 RL 学习 policy 与训练开始时所用基础模型相似的 KL 惩罚。这使模型在训练期间能够进行更多探索。RAGEN [@wang2025ragenunderstandingselfevolutionllm]、Magistral、OpenReasonerZero、Skywork OR-1 等均采用了此方法。
 - **放宽 policy gradient 裁剪**：GRPO 算法的新变体，如 DAPO [@yu2025dapo]，提出了对 GRPO（或 PPO）中双侧裁剪目标的改进，以实现更好的探索。研究还表明，当 reward 不完美时，裁剪可能导致潜在的虚假学习信号 [@shao2025spurious]。RAGEN、Magistral、INTELLECT-2 等均采用了针对不同梯度方向使用不同范围的双侧裁剪方法。
 - **离线数据（或完全异步更新）**：随着 RL 解决任务所需补全长度随问题难度的增加而急剧增长（尤其是响应长度的*方差*，其中通常存在极长的异常值），RL 运行中的算力可能处于空闲状态。为解决这一问题，训练正转向异步更新，或调整问题在批次中的组织方式以提高整体吞吐量。Seed-Thinking 1.5、INTELLECT-2 等均采用了部分至完全异步（离线）数据。
 - **额外的格式 reward**：为使 reasoning 过程可预测，许多模型添加了少量 reward，以确保模型遵循正确格式，例如在答案前输出 `<think>...</think>`。DeepSeek R1、OpenReasonerZero、Magistral、Skywork OR-1 等均采用了此方法。
 - **语言一致性 reward**：与格式 reward 类似，一些多语言 reasoning 模型使用语言一致性 reward，优先选择在 reasoning 过程中不切换语言的模型（以获得更好、更可预测的用户体验）。DeepSeek R1、Magistral 等均采用了此方法。
 - **长度惩罚**：许多模型在 RL 训练中使用不同形式的长度惩罚，以稳定长期学习过程或减轻对难题的过度思考。例如，Kimi 1.5 在训练准确率在难度课程中保持较高时，逐步延长目标长度以对抗过度思考；INTELLECT-2 则在整个训练过程中施加小幅长度惩罚。逐步延长训练序列长度可通过迫使模型首先在 thinking 预算有限的领域进行有效 reasoning，再过渡到更长训练以在更复杂问题上高效运用这些行为，从而缓解过度思考。其他模型则使用超长过滤及其他相关实现来提高吞吐量。
 - **损失归一化**：关于原始 GRPO 算法的逐组归一化项可能引入长度或难度偏差的讨论（参见 policy gradient 章节或 [@liu2025understanding]）已有一些。因此，Magistral 或 MiMo 等部分模型选择在批次级别而非组级别对损失或优势进行归一化。
-- **并行 test-time compute 扩展**：将多个并行独立采样的 rollout 的答案合并，可以相对于使用单个 rollout 的答案带来显著改善。最简单的并行 test-time compute 扩展形式（如 DeepSeek-R1、Phi-4 等所采用的）是使用多数 rollout 返回的答案作为最终答案。更高级的技术是使用经过训练的评分模型从并行 rollout 的答案中选出最佳答案。这一技术尚未被开放 reasoning 模型方案采用（截至 2025 年 6 月），但在 Claude 4 发布公告 [@anthropic2025claude4] 中有所提及，并在 DeepSeek-GRM [@liu2025inference] 中得到应用。
+- **并行 test-time compute 扩展**：将多个并行独立采样的 rollout 的答案合并，可以相对于使用单个 rollout 的答案带来显著改善。最简单的并行 test-time compute 扩展形式（如 DeepSeek-R1、Phi-4 等所采用的）是使用多数 rollout 返回的答案作为最终答案。更高级的技术是使用经过训练的评分模型从并行 rollout 的答案中选出最佳答案。截至 2026 年，这一技术尚未在开放且有文档记录的 reasoning 模型方案中普及，但在 Claude 4 发布公告 [@anthropic2025claude4] 中有所提及，并在 DeepSeek-GRM [@liu2025inference] 中得到应用。
 
 除上述常见技术外，还有许多关于 reasoning 训练如何在不牺牲附加能力的情况下构建有用模型的共同发现：
 
 - **纯文本 reasoning 提升多模态性能**：Magistral、MiMo-VL 等发现，先训练多模态模型，再在此多模态训练之后进行纯文本 reasoning 训练，可以*提升*最终模型的多模态性能。
-- **通过系统提示切换 reasoning**（或长度控制）：Llama-Nemotron、Nemotron Nano、Qwen 3、SmolLM 3 等使用特定系统提示（可能结合长度控制 RL 训练 [@aggarwal2025l1]），为用户提供可切换的 thinking 长度开/关功能。其他开放模型，如 OpenAI 的 GPT-OSS 和 LLM360 的 K2-V2 [@liu2025k2]，在系统提示中采用低/中/高 reasoning 努力程度设置，但这类行为的训练方法尚未得到充分记录。
+- **通过系统提示切换 reasoning**（或长度控制）：Llama-Nemotron、Nemotron Nano、Qwen 3、SmolLM 3 等使用特定系统提示（可能结合长度控制 RL 训练 [@aggarwal2025l1]），为用户提供可切换的 thinking 长度开/关功能。其他开放模型，如 OpenAI 的 gpt-oss 和 LLM360 的 K2-V2 [@liu2025k2]，在系统提示中采用低/中/高 reasoning 努力程度设置，但这类行为的训练方法尚未得到充分记录。
 
 ## 展望未来
 
 reasoning 模型领域的演进速度超过近期记忆中 AI 研究的任何其他领域，本章列出的某些常见实践将不可避免地被新技术所取代。
 
-目前已有多项工作致力于系统性地理解 reasoning 训练奏效的原因。OLMo 3 Think [@teamolmo2025olmo3] 代表了对 reasoning 模型完整训练生命周期最全面的公开记录，为研究社区提供了每个阶段的检查点和数据，最终在 220 个 GPU 上完成了近 4 周的训练运行。类似地，关于理解 RL 用于 reasoning 的扩展特性的工作 [@khatri2025art] 正开始将先前仅被实践者直觉感知的算力、数据与性能之间的关系加以正式化。
+目前已有多项工作致力于系统性地理解 reasoning 训练奏效的原因。Olmo 3 Think [@teamolmo2025olmo3] 代表了对 reasoning 模型完整训练生命周期最全面的公开记录，为研究社区提供了每个阶段的检查点和数据，最终在 220 个 GPU 上完成了近 4 周的训练运行。类似地，关于理解 RL 用于 reasoning 的扩展特性的工作 [@khatri2025art] 正开始将先前仅被实践者直觉感知的算力、数据与性能之间的关系加以正式化。
 
 有一点依然清晰：强化学习已经从"蛋糕上的樱桃"（借用那个比喻）晋升为前沿模型训练的承重组件。本章围绕 RLVR 理念介绍的那些次要技术——难度过滤、格式 reward 等等——并非最终答案，但它们代表了该领域目前对如何从语言模型中激发 reasoning 能力的最佳理解。

@@ -1,4 +1,4 @@
-<!-- source-commit: 02c6d49 -->
+<!-- source-commit: eecc49e -->
 <!--
   Copyright (c) 2025-2026 Nathan Lambert.
   Licensed under CC BY-NC-SA 4.0:
@@ -10,14 +10,18 @@ prev-chapter: "正则化"
 prev-url: "15-regularization"
 page-title: 评估
 search-title: "第16章：评估"
-next-chapter: "产品与特性"
+meta-description: "衡量 RLHF、post-training、reward model、开放式生成与模型行为的评估方法。"
+next-chapter: "塑造模型特性与产品"
 next-url: "17-product"
+lectures:
+  - video: "https://www.youtube.com/watch?v=dFafQmClYq4&list=PLL1tdVxB1CpVpEtMHxwuR4uI4Lxjw00_y&index=19"
+    label: "第十二讲：前沿模型评估的演变"
 ---
 
 # 评估
 
 评估是一套用于理解本书所述训练过程的质量与影响的技术体系。
-评估通常通过 benchmark 来呈现（常见 benchmark 包括 MMLU、GPQA、SWE-Bench、MATH 等），这些 benchmark 是离散的问题集或环境，旨在衡量模型的某一特定属性。
+评估通常通过 benchmark 来呈现（常见 benchmark 包括 MMLU、GPQA、SWE-bench、MATH 等），这些 benchmark 是离散的问题集或环境，旨在衡量模型的某一特定属性。
 评估是一种不断演进的方法，因此本章将呈现 RLHF 领域评估的近期发展阶段，以及将延续至语言模型未来发展的共同主题。
 理解语言模型评估（尤其是 post-training 阶段）的关键在于：当前主流的评估体系是对主流训练实践与目标的反映。
 尽管具有挑战性的评估推动语言模型向新领域进步，但大多数评估仍围绕为新模型构建有效信号而设计。
@@ -32,12 +36,12 @@ RLHF 与 post-training 的评估在其早期历史中经历了几个明显的阶
 
 在此之外，新的领域还将不断涌现。
 随着 AI 日益走向产业化，评估的激励结构正在转变，并呈现出多利益相关方的特征。
-自 ChatGPT 发布以来，私有评估（如 Scale Leaderboard [@scale2024seal]）、社区驱动的评估（如 Arena [@chiang2024chatbot]）以及第三方评估机构（如 ArtificialAnalysis 和 Epoch AI）相继涌现。
+自 ChatGPT 发布以来，私有评估（如 Scale Leaderboard [@scale2024seal]）、社区驱动的评估（如 Arena [@chiang2024chatbot]）以及第三方评估机构（如 Artificial Analysis 和 Epoch AI）相继涌现。
 本章将穿插介绍这些评估的实施方式与理解视角。
 
-## Prompting 格式：从 Few-shot 到 Zero-shot 再到 CoT
+## Prompting 格式
 
-对语言模型进行 **prompting** 首先是一种操作行为，但它也被视为一种可以专门练习和/或系统性训练的技艺 [@schulhoff2024prompt]。
+对语言模型进行 **prompting** 本身是一个简单且相当自然的动作，但它也被视为一种可以练习并不断精进的技艺 [@schulhoff2024prompt]。
 Prompt 是向语言模型组织信息和上下文的方式。
 对于常规交互，prompt 相对简单。
 对于复杂场景，精心设计的 prompt 将决定特定用例的成败。
@@ -47,8 +51,13 @@ Prompt 是向语言模型组织信息和上下文的方式。
 类似地，prompt 的改变也能帮助模型在训练过程中学习得更好。
 通俗地说，对模型进行良好的 prompting 有时能带来使用未来模型的主观体验，释放出超出正常使用范围的性能表现。
 
+prompting 带来的收益通常小于改进数据或训练算法等核心领域，但在最终产品中可能相当可观。
+更重要的启示是：在训练一个强大的领先模型时，破坏它并导致性能骤降，要比找到一点点额外的性能容易得多。
+
 使用现代语言模型进行良好的 prompting，可能需要为模型准备整篇报告作为输入（通常包含数千个 token 的生成文本）。
 这种行为源于语言模型性能的衡量与理解方式发生的诸多变化。
+
+### Few-Shot Prompting 与 Log-Likelihood Scoring
 
 早期语言模型仅被用作智能自动补全工具。
 为了以更开放的方式使用这些模型，人们会向模型展示多个示例，再附上一段不完整的提示语。这被称为 few-shot 或 in-context learning [@brown2020language]，当时并不涉及 instruction tuning 或 RLHF。
@@ -119,7 +128,7 @@ Correct Answer:
 对数似然打分有两种可能的实现方式——第一种是查看字母 (A) 的概率，第二种是查看答案"The Mean Value Theorem"的概率。
 这两种都是可用的指标，但预测答案字母比预测完整的、可能包含多个 token 的答案概率要简单得多。
 对数似然打分在 pretraining 评估中更为常见，因为此阶段的模型缺乏 exact match 所需的问答格式，而 exact match 则是 post-training 的标准做法 [@teamolmo2025olmo3]。
-Exact match 存在不同的问题，例如需要严格的格式后缀（如 `The answer is:`），或者需要在生成的文本中任意位置检测答案（例如查找 `(C)` 或答案字符串本身）。
+Exact match 存在不同的问题，例如需要严格的格式后缀（如 `The answer is:`），或者使用正则表达式在生成的文本中任意位置检测答案（例如查找 `(C)` 或答案字符串本身）。
 如果 evaluation 格式与模型的生成方式不匹配，得分可能会大幅下降。
 使用语言模型进行 evaluation 时，最好确保格式不成为瓶颈，从而能够充分测试模型的完整能力。
 实现与格式无关的 evaluation 需要大量的努力和调试才能做好，在实践中相当罕见。
@@ -127,6 +136,8 @@ Exact match 存在不同的问题，例如需要严格的格式后缀（如 `The
 回到 evaluation 的历史。
 无论使用上述哪种设置，few-shot prompting 的一个常见挑战是模型不会遵循格式，这会被计为错误答案。
 在设计 evaluation 领域时，上下文中使用的示例数量通常被视为一个设计参数，范围从 3 到 8 个甚至更多。
+
+### Chain-of-Thought Prompting
 
 在 few-shot prompting 的演进过程中，出现了为模型提供 chain-of-thought 示例以供其遵循的想法。
 这以上下文示例中包含书面推理过程的形式呈现，如下所示（这后来被显式 prompting 生成推理步骤所取代）[@wei2022chain]：
@@ -148,11 +159,13 @@ A: Roger started with 5 balls. 2 cans of 3 tennis balls each is 6 tennis balls. 
 
 Q: The cafeteria had 23 apples. If they used 20 to make lunch and bought 6 more, how many apples do they have?
 
-A: The cafeteria had 23 apples originally. They..
+A: The cafeteria had 23 apples originally. They...
 ```
 
+### Zero-Shot Instruction Following
+
 随着时间的推移，语言模型变得越来越强大，它们逐渐演进到 zero-shot evaluation，即所谓的"zero-shot learners"[@wei2021finetuned]。
-Finetuned Language Net（FLAN）表明，针对特定任务进行 fine-tuning 的语言模型——作为现代指令调整的前身——能够泛化到它们未曾训练过的 zero-shot 问题 [@wei2021finetuned]（T0 中也发现了类似结果 [@sanh2021multitask]）。
+FLAN 表明，针对特定任务进行 fine-tuning 的语言模型——作为现代指令调整的前身——能够泛化到它们未曾训练过的 zero-shot 问题 [@wei2021finetuned]（T0 中也发现了类似结果 [@sanh2021multitask]）。
 这是 instruction fine-tuning（IFT）的出现，它是 RLHF 和 post-training 的重要前驱。
 一个 zero-shot 问题如下所示：
 
@@ -165,6 +178,8 @@ Assistant:
 伴随这些模型而来的核心能力和使用场景转变是更加开放性的使用方式。
 随着使用方式愈加开放，从模型中采样进行 evaluation 变得越来越流行，因为这更能反映实际使用情况——从技术上讲，这可以被称为基于生成的（exact-match）evaluation，但它还没有一个清晰的规范术语。
 在 ChatGPT 之后这段时期到近年来，一些多项选择 evaluation 仍然在 RLHF 研究中被使用，因为任何向通用实践的过渡都需要相当长的时间，通常需要数年才能展开（例如，这类 evaluation：将温度设置为零并采样字符 A、B、C 或 D）。
+
+### 推理时代的 Evaluation Prompts
 
 随着推理模型在 2024 年底至 2025 年初的兴起，模型行为的一个重大变化是在每个答案之前增加了长 Chain-of-Thought（CoT）推理过程。
 这些模型不再需要使用 [@kojima2022large] 中提出的经典短语"think step by step"进行 prompting。
@@ -189,6 +204,17 @@ Answer the above question and REMEMBER to finish your response with the exact ph
 这一点，尤其是当模型使用特殊格式将思考 tokens 与答案 tokens 分开时，促使了 evaluation 体系最近一次重大更新的出现。
 Evaluation 正在向测试模型以生成方式响应并结合 chain-of-thought prompting 的方向发展。
 
+### Agentic Evaluation 的复杂性
+
+随着模型走向 agent，evaluation 范式正变得越来越复杂。
+system prompt 和 inference 软件现在成为额外的层——主要通过 harness 这一中介软件——以及运行该软件的基础设施。
+harness 是一个循环，其中包含用于管理上下文的 prompts 和 skills，例如 compaction、工具、凭据等。
+对于 agentic evaluation，模型通常需要在沙盒中运行，沙盒是定义明确的世界，包含特定信息（例如解决任务所需的文件）以及使 evaluation 可重现的规则（例如特定的工具定义）。
+沙盒增加了运行模型的复杂性，因为除了用于 inference 的 GPU 之外，现在通常还需要更多 CPU。
+更多信息可参阅 Florian Brand 的[这场演讲](https://www.youtube.com/watch?v=CGjuKIppZSs)、@fig:eval-components 中的系统示意图，或阅读这一时代最流行的 evaluation Terminal-Bench 的原始版本 [@tbench2025] 以及难度更高的 Terminal-Bench 2.0 [@tbench2026]。
+
+![运行现代 agentic evaluation 的各个组成部分——每个方框都会影响最终得分。示意图改绘自 Florian Brand 的演讲"LLM benchmarks in the era of agents"。](images/eval_components_tikz.png){#fig:eval-components .center data-dark-src="images/eval_components_tikz-dark.png"}
+
 ## 为何许多外部 Evaluation 比较不可靠
 
 AI 公司在模型发布公告中进行的语言模型 evaluation，只能与其他新闻稿在较大误差范围内进行比较——即稍好或稍差的模型应被视为等效——因为各家公司内部使用的 evaluation 流程在不同模型之间并不统一，也没有明确的文档记录。
@@ -198,7 +224,7 @@ Hillclimbing 是一个口语化术语，用于描述使模型在一组目标 ben
 对于社区用于比较领先模型的公开 evaluation，无法知晓哪些被用于训练，哪些被保留用于测试。
 
 随着 evaluation 分数成为企业营销方案的核心组成部分，各公司内部的实现方式已经出现偏差。
-有传言称，主要 AI 实验室为 GSM8k 或 MATH 等重要 evaluation 使用"自定义 prompts"。
+有传言称，主要 AI 实验室为 GSM8K 或 MATH 等重要 evaluation 使用"自定义 prompts"。
 这些实践演变迅速。
 
 语言模型 evaluation 栈被视为营销工具，因为这些 evaluation 没有硬性的事实来源。
@@ -231,10 +257,10 @@ Hillclimbing 是一个口语化术语，用于描述使模型在一组目标 ben
 
 ## 实验室如何在内部实际使用 Evaluation 来改进模型
 
-对前沿语言模型的 evaluation，在今天既是一门艺术，也是一门科学，准确规定不同团队如何使用 evaluation 是不可能的。
+对前沿语言模型的 evaluation，在今天既是一门艺术，也是一门科学；要准确说明不同团队如何使用 evaluation 来理解前沿语言模型，本身就足以写成一本教科书。
 
 不同团队选择不同的 evaluation 来保持独立性，即将其作为真正的测试集，但没有人披露他们选择了哪些。
-例如，流行的推理 evaluation MATH 和 GSM8k 都有训练集，其中的 prompts 可以很容易地用来提高性能。
+例如，流行的推理 evaluation MATH 和 GSM8K 都有训练集，其中的 prompts 可以很容易地用来提高性能。
 使用来自同一分布的 prompts 来提高性能，与通过训练通用数学数据来泛化到这些任务，是非常不同的。
 事实上，这些*训练集*包含非常高质量的数据，因此模型可以从在其上进行训练中获益。
 如果这些公司*并未*将相应的 evaluation 作为核心指标来追踪，那么在 evaluation 集上进行训练可能是一个实际可行的决策，因为高质量数据是模型开发的主要限制因素。
@@ -249,7 +275,7 @@ post-training 的 evaluation 与人工评估高度相互依赖。
 他们选择关注的有限 evaluation 集合在 evaluation 与训练之间形成了紧密联系。
 曾经有一段时间，MMLU 是重点关注的 evaluation 之一。
 GPQA 在推理模型兴起期间极为流行，这得益于社区对科学能力的日益关注。
-各实验室会修改 evaluation 以使其更适合自身需求，例如 OpenAI 发布了 SWE-Bench-Verified [@openai2024swebench]。
+各实验室会修改 evaluation 以使其更适合自身需求，例如 OpenAI 发布了 SWE-bench Verified [@openai2024swebench]。
 此外，每个前沿实验室还构建或购置了许多公众无法获取的内部 evaluation。
 
 在内部改进 evaluation 对下游训练的关键影响在于**提升比较训练运行时的统计功效**。
@@ -262,7 +288,7 @@ GPQA 在推理模型兴起期间极为流行，这得益于社区对科学能力
 ## Contamination
 
 当前语言模型实践中（即不仅限于 RLHF 和 post-training）的一个重大问题，是有意或无意地将 evaluation 数据集中的数据用于训练。
-这被称为*数据集污染（dataset contamination）*，相应地，避免污染的实践称为*去污染（decontamination）*。
+这被称为*数据集污染（dataset contamination）*（一种*数据泄漏（data leakage）*），相应地，避免污染的实践称为*去污染（decontamination）*。
 为了对数据集进行去污染，需要对训练集和测试集进行搜索，通过词/子词 token 上的 n-gram 重叠，或固定长度的字符子串匹配（例如 50 个字符）来查找匹配项 [@singh2024evaluation]。
 数据被污染的方式有很多，但最常见的是在多个阶段从网络抓取训练数据时引入的。
 benchmark 通常发布在被爬取的公开网页上，或者用户将问题输入给模型，这些内容随后可能出现在未来模型的候选训练数据中。
@@ -275,7 +301,7 @@ benchmark 通常发布在被爬取的公开网页上，或者用户将问题输�
 这种 base model 污染（无法确切证明模型行为为何如此）已成为许多早期基于 Qwen 2.5 和 Qwen 3 base model 的 RLVR 工作中一个重要的干扰变量 [@shao2025spurious] [@wu2025reasoning]。
 
 为了理解不披露或不发布训练数据的模型的污染情况，研究者会创建新版本的 benchmark，其中包含对原题稍加改动的问题（例如针对 MATH 的改动 [@huang2025math]），以此观察哪些模型是针对原始格式或题目进行训练的。
-这些扰动 benchmark 上的高方差并不能证实污染，这一点难以证明，但可能表明某些模型是针对特定格式训练的，这种训练未必能转化为真实世界的性能。
+这些扰动 benchmark 上的高方差并不能证实污染，这一点难以证明。更确切地说，它可能表明某些模型是针对特定格式训练的，这种训练未必能转化为真实世界的性能。
 
 
 ## Tooling
@@ -284,7 +310,8 @@ benchmark 通常发布在被爬取的公开网页上，或者用户将问题输�
 其中包括：
 
 - 来自英国安全研究所的 Inspect AI [@inspectAI2024]，
-- HuggingFace 的 LightEval [@fourrier2023lighteval]，为 Open LLM Leaderboard [@open-llm-leaderboard-v2] 提供支持，
-- Eleuther AI 基于其 GPT-Neo-X 模型基础设施构建的 evaluation harness [@gao2023evalharness]（包含良好的 GPT-3 时代 evaluation 设置和配置）[@gpt-neox-20b]，
-- AI2 基于 OLMES 构建的库 [@gu2024olmes]，
+- Hugging Face 的 LightEval [@fourrier2023lighteval]，为 Open LLM Leaderboard [@open-llm-leaderboard-v2] 提供支持，
+- EleutherAI 基于其 GPT-Neo-X 模型基础设施构建的 evaluation harness [@gao2023evalharness]（包含良好的 GPT-3 时代 evaluation 设置和配置）[@gpt-neox-20b]，
+- Ai2 基于 OLMES 构建的库 [@gu2024olmes]，
 - Stanford 基础模型研究中心的 HELM [@liang2023helm]，
+- Mosaic（现为 Databricks）的 Eval Gauntlet [@mosaicml2024gauntlet]，等等。
