@@ -29,10 +29,11 @@ NAV_LABELS = [
     ("<h3>Practical Considerations</h3>", "<h3>实践考量</h3>"),
     ("<h3>Appendices</h3>", "<h3>附录</h3>"),
     (">Home</a>", ">主页</a>"),
+    (">PDF</a>", ">PDF（英文）</a>"),
     ("<li>Order: ", "<li>购买："),
-    (">RL Cheatsheet<", ">RL 速查表<"),
-    (">Compare Model Completions<", ">模型补全对比<"),
-    (">Accompanying Course<", ">配套课程<"),
+    (">RL Cheatsheet<", ">RL 速查表（英文）<"),
+    (">Compare Model Completions<", ">模型补全对比（英文）<"),
+    (">Accompanying Course<", ">配套课程（英文）<"),
     # chapters
     (">Introduction<", ">引言<"),
     (">A Tiny History of RLHF<", ">RLHF 简史<"),
@@ -84,6 +85,11 @@ def make_nav(src):
     src = re.sub(r'href="/c/([^"]+)"', r'href="\1"', src)
     src = re.sub(r'href="/([^"]*)"', lambda m: f'href="{UP}{m.group(1)}"', src)
     src = replace_checked(src, NAV_LABELS, "nav.js")
+    # 主页 is the CN landing page (c/cn/index.html); keep a way back to the English book.
+    src = src.replace(
+        f'<a href="{UP}">主页</a>',
+        f'<a href="./">主页</a> / <a href="{UP}">English</a>',
+    )
     # markCurrentPage only handled root-absolute hrefs; resolve relative ones too.
     src = src.replace("""querySelectorAll('a[href^="/"]')""", "querySelectorAll('a[href]')")
     src = src.replace(
@@ -99,7 +105,7 @@ def make_chapter(src):
     src = src.replace('<script src="nav.js"', '<script src="nav-cn.js"')
     src = src.replace(
         '<a href="https://rlhfbook.com/" style="color: inherit;',
-        f'<a href="{UP}" style="color: inherit;',
+        '<a href="./" style="color: inherit;',
     )
     return replace_checked(src, CHAPTER_LABELS, "chapter.html")
 

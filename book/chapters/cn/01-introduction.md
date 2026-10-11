@@ -7,7 +7,7 @@
 -->
 ---
 prev-chapter: "主页"
-prev-url: "https://rlhfbook.com/"
+prev-url: "./"
 page-title: 引言
 search-title: "第1章：引言"
 meta-description: "从第一性原理介绍RLHF、它如何改变language models，以及它如何成为现代post-training的一部分。"

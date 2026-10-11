@@ -270,7 +270,7 @@ Hillclimbing 是一个口语化术语，用于描述使模型在一组目标 ben
 
 post-training 的 evaluation 与人工评估高度相互依赖。
 对于生成式语言模型的人工评估会产生 Elo 排名（在 Anthropic 早期论文如 Constitutional AI 中很流行），而对 reward model 的人工评估则反映一致性程度。
-这些也可以通过在 A/B 测试窗口中向用户提供两个不同模型来获得（如[偏好数据章节](https://rlhfbook.com/c/11-preference-data)中所讨论的）。
+这些也可以通过在 A/B 测试窗口中向用户提供两个不同模型来获得（如[偏好数据章节](11-preference-data)中所讨论的）。
 
 他们选择关注的有限 evaluation 集合在 evaluation 与训练之间形成了紧密联系。
 曾经有一段时间，MMLU 是重点关注的 evaluation 之一。

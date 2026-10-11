@@ -135,3 +135,14 @@ Chapter sizes for reference:
 - 06-policy-gradients.md: 1322 lines → 11 chunks
 - 05-reward-models.md: 521 lines → 4 chunks
 - Most others: 150–370 lines → 1–3 chunks
+
+---
+
+## CN-only files and intentional deviations from the English text
+
+- `index.md` is the CN landing page (served at `/c/cn/`); it has no English
+  source. Update its chapter list if upstream adds/renames chapters.
+- Links to other chapters are relative (`](04-instruction-tuning)`), not
+  `https://rlhfbook.com/c/...`, so readers stay on the CN site. Keep this when
+  syncing new text. The first chapter's `prev-url` and the last appendix's
+  `next-url` point at `./` (the landing page).

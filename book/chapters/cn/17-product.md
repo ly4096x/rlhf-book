@@ -36,7 +36,7 @@ Fine-tuning 也优于激活引导（Activation Steering）[@turner2023activation
 截至 2026 年，我们尚不清楚 character 训练究竟对模型产生哪些核心权衡、应如何研究它，以及它能在多大程度上提升用户偏好指标——例如 Arena（前身为 Chatbot Arena，一个用户对 LLM 能力进行盲测的流行平台）上的表现。这些问题值得深入探讨，以便了解 AI 公司如何调整模型来最大化用户参与度及其他面向用户的指标。
 我们*确实知道*的是，character 训练使用了本书讨论的相同方法，但目标更加精细，聚焦于模型所使用语言的特征（即 character 训练的大部分工作是开发流水线，以控制模型训练数据中的特定语言，例如删除诸如`Certainly`或`as an AI model built by...`之类的常见短语）。
 Character 训练涉及大量数据过滤和合成数据方法，例如专注于模型行为方式的 Constitutional AI。
-这些变化往往难以在我们在[评估章节](https://rlhfbook.com/c/16-evaluation)中提到的所有基准测试体系中得到量化，因为 AI 实验室会利用 character 训练对个性进行细微调整，以随时间推移改善用户体验。
+这些变化往往难以在我们在[评估章节](16-evaluation)中提到的所有基准测试体系中得到量化，因为 AI 实验室会利用 character 训练对个性进行细微调整，以随时间推移改善用户体验。
 
 例如，Anthropic 在其 Claude 3 模型中加入了 Character 训练 [@anthropic2024claude]：
 

@@ -12,7 +12,7 @@ page-title: "附录 C：实践问题"
 search-title: "附录 C：实践问题"
 meta-description: "运行 RLHF 与 post-training 实验的实践建议，从工程约束到调试。"
 next-chapter: "主页"
-next-url: "https://rlhfbook.com/"
+next-url: "./"
 ---
 
 # 实践问题

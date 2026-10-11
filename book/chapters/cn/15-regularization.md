@@ -150,7 +150,7 @@ $$ {#eq:dpo_nll_expanded}
 
 在 RLHF 体系的其他部分，对优化的控制定义得没那么清晰。
 大多数 reward model 除了标准对比损失函数之外没有额外的 regularization。
-Direct Alignment Algorithms 通过 $\beta$ 参数以不同方式处理对 KL divergence 的 regularization（参见 [direct alignment 章节](https://rlhfbook.com/c/08-direct-alignment)）。
+Direct Alignment Algorithms 通过 $\beta$ 参数以不同方式处理对 KL divergence 的 regularization（参见 [direct alignment 章节](08-direct-alignment)）。
 
 Llama 2 为 reward model 训练提出了一种 margin 损失 [@touvron2023llama]：
 

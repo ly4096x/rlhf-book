@@ -208,7 +208,7 @@ np.allclose(x, x_sorted[np.argsort(sorted_indices)])
 ### Fine-Tuning
 
 选出 completions 后，在当前版本的模型上执行标准的 instruction fine-tuning。
-更多详情可参见 [instruction tuning 章节](https://rlhfbook.com/c/04-instruction-tuning)。
+更多详情可参见 [instruction tuning 章节](04-instruction-tuning)。
 
 ## 实现细节
 
@@ -218,7 +218,7 @@ np.allclose(x, x_sorted[np.argsort(sorted_indices)])
 - **每个 Prompt 的 Completions 数量**：成功的 rejection sampling 实现通常为每个 prompt 生成 10 到 30 个或更多的 completions。使用过少的 completions 会使训练产生偏差和/或噪声。
 - **Instruction tuning 细节**：目前尚未公开 rejection sampling 阶段 instruction tuning 的明确训练细节。很可能使用的设置与模型初始 instruction tuning 阶段略有不同。
 - **异构模型生成**：部分 rejection sampling 实现中，生成内容来自多个模型，而非仅限于待训练的当前模型。关于如何执行此操作的最佳实践尚未建立。
-- **Reward model 训练**：所使用的 reward model 将对最终结果产生重大影响。有关 reward model 训练的更多资源，请参见[相关章节](https://rlhfbook.com/c/05-reward-models)。
+- **Reward model 训练**：所使用的 reward model 将对最终结果产生重大影响。有关 reward model 训练的更多资源，请参见[相关章节](05-reward-models)。
 
 在进行批量 reward model inference 时，可以按长度对 tokenized completions 进行排序，使批次长度相近。
 这样可以减少在 padding tokens 上运行 inference 的需要，以较小的实现复杂度换取更高的吞吐量。
