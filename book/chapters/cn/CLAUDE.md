@@ -171,3 +171,30 @@ levels below the site root, so keep the relative-path conventions:
 `../../pagefind/`, `../../data/library.json`, `nav-cn.js`, sibling links for CN chapters.
 The course page links to English-only lecture slides (`../../teach/...`); the slide
 decks themselves are not translated.
+
+## Slide decks (`teach/cn/`)
+
+Chinese decks mirror the English ones: `teach/cn/course/*.md`, `teach/cn/extras/01-shoggoths.md`,
+`teach/cn/SALA-2026/talk.md` (the `lec9-plan.md` planning doc is not a deck). `assets/` and `refs.bib`
+in each directory are symlinks to the English ones. `make cn-teach` (part of `make teach`) builds each
+deck to `build/html/teach/cn/<kind>/<name>/{index.html,slides.pdf}` via `book/scripts/build_cn_deck.sh`
+(content-hash cached like the English decks). The course page links to them.
+
+Decks have no `source-commit` line (the file must start with the YAML front matter); the synced upstream
+commit is recorded in `TRANSLATION_CN.md`. To sync after upstream changes a deck:
+`git diff <hash> HEAD -- teach/course/<deck>.md`, then edit the CN deck in place.
+
+**Slide structure must stay identical** to the English deck so slide numbers, Q&A anchors (`qa-0N/#12`) and
+the `{n}/{N}` counters line up: same `---` / `|||` / `===` separators, same directive comments
+(`<!-- layout/columns/rows/step/animate/cite-right/... -->`), same code fences, images, math and URLs.
+Translate only prose, titles, captions, `title:`/`footer.center:` front matter, `<!-- footnote*: ... -->`
+text, and the `title:`/`content:` text inside ```box fences. Keep ```conversation / ```iframe /
+```builtwith / ```text / ```python fences verbatim (model I/O and embeds). Never put Chinese inside math.
+`footer.left` is "RLHF Book 中文版".
+
+When translating a whole deck from scratch, split it at slide boundaries into ~130-line chunks, translate
+each chunk to a file with exactly the same number of lines, then concatenate; a structural check
+(separators, directives, math, fences, images, URLs, citations, HTML tags equal between source and
+translation) catches most mistakes. Not translated: `teach/assets/from-research-to-practice.pdf`
+(produced outside this repo), the slide images themselves (English text inside PNGs), and the YouTube
+recordings.

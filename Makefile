@@ -450,11 +450,11 @@ TEACH_STAMP_DIR = $(BUILD)/.teach-stamps
 # teach_hash(files, find-paths): stable content hash of a deck's inputs.
 teach_hash = { shasum -a 256 $(1) uv.lock Makefile; find $(2) -type f -exec shasum -a 256 {} + 2>/dev/null | LC_ALL=C sort; } | shasum -a 256 | cut -d' ' -f1
 
-teach: $(foreach d,$(TEACH_DIRS),teach-$(d)) course-lectures extras-lectures
+teach: $(foreach d,$(TEACH_DIRS),teach-$(d)) course-lectures extras-lectures cn-teach
 	@# Prune outputs for talks that no longer exist (a restored cache may carry them)
 	@for d in $(BUILD)/html/teach/*/; do \
 		[ -d "$$d" ] || continue; n=$$(basename "$$d"); \
-		case " $(TEACH_DIRS) course extras assets " in \
+		case " $(TEACH_DIRS) course extras assets cn " in \
 			*" $$n "*) ;; \
 			*) echo "Pruning stale teach/$$n"; rm -rf "$$d";; \
 		esac; \
@@ -479,6 +479,18 @@ extras-lectures: $(foreach l,$(EXTRA_LECTURE_NAMES),extras-lecture-$(l))
 			*) echo "Pruning stale teach/extras/$$n"; rm -rf "$$d";; \
 		esac; \
 	done
+
+# Chinese slide decks: sources in teach/cn/{course,extras,SALA-2026}/ (assets/ and refs.bib
+# there are symlinks to the English directories); built to build/html/teach/cn/.
+CN_DECK_SOURCES = $(wildcard teach/cn/course/*.md) $(wildcard teach/cn/extras/*.md) $(wildcard teach/cn/SALA-2026/*.md)
+CN_DECK_TARGETS = $(patsubst teach/cn/%.md,cn-deck/%,$(CN_DECK_SOURCES))
+.PHONY: cn-teach $(CN_DECK_TARGETS)
+
+cn-teach: $(CN_DECK_TARGETS)
+	@echo "All CN decks built"
+
+$(CN_DECK_TARGETS): cn-deck/%:
+	@book/scripts/build_cn_deck.sh teach/cn/$*.md
 
 # Static files (externally produced slide PDFs, etc.) served at /teach/assets/
 teach-assets:

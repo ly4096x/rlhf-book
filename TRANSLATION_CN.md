@@ -58,7 +58,32 @@ After updating a translation, set the first line of the translated file to the n
 | book/rl-cheatsheet/inside_cover_back.tex | book/cn/rl-cheatsheet.tex | 0106c01 |
 | book/metadata.yml | book/metadata-cn.yml | 0106c01 |
 
-Not translated: the lecture slide decks under `teach/` (linked from the CN course page as English).
+Slide decks (built by `make cn-teach`, see `book/chapters/cn/CLAUDE.md`):
+
+| Original | Translation | Source Commit |
+|---|---|---|
+| teach/course/lec0-prereq-review.md | teach/cn/course/lec0-prereq-review.md | 0106c01 |
+| teach/course/lec1-chap1-3.md | teach/cn/course/lec1-chap1-3.md | 0106c01 |
+| teach/course/lec2-chap4-5-9.md | teach/cn/course/lec2-chap4-5-9.md | 0106c01 |
+| teach/course/lec3-chap6-p1.md | teach/cn/course/lec3-chap6-p1.md | 0106c01 |
+| teach/course/lec4-chap6-p2.md | teach/cn/course/lec4-chap6-p2.md | 0106c01 |
+| teach/course/lec5-chap7.md | teach/cn/course/lec5-chap7.md | 0106c01 |
+| teach/course/lec6-chap8-dpo.md | teach/cn/course/lec6-chap8-dpo.md | 0106c01 |
+| teach/course/lec7-chap12-synthetic-data.md | teach/cn/course/lec7-chap12-synthetic-data.md | 0106c01 |
+| teach/course/lec8-chap10-11-preferences.md | teach/cn/course/lec8-chap10-11-preferences.md | 0106c01 |
+| teach/course/lec9-chap14-appb-overoptimization.md | teach/cn/course/lec9-chap14-appb-overoptimization.md | 0106c01 |
+| teach/course/lec10-chap15-regularization.md | teach/cn/course/lec10-chap15-regularization.md | 0106c01 |
+| teach/course/lec11-chap13-tools.md | teach/cn/course/lec11-chap13-tools.md | 0106c01 |
+| teach/course/lec12-chap16-evals.md | teach/cn/course/lec12-chap16-evals.md | 0106c01 |
+| teach/course/lec13-chap17-character.md | teach/cn/course/lec13-chap17-character.md | 0106c01 |
+| teach/course/qa-01.md | teach/cn/course/qa-01.md | 0106c01 |
+| teach/course/qa-02.md | teach/cn/course/qa-02.md | 0106c01 |
+| teach/course/qa-03.md | teach/cn/course/qa-03.md | 0106c01 |
+| teach/course/conversation-01.md | teach/cn/course/conversation-01.md | 0106c01 |
+| teach/extras/01-shoggoths.md | teach/cn/extras/01-shoggoths.md | 0106c01 |
+| teach/SALA-2026/talk.md | teach/cn/SALA-2026/talk.md | 0106c01 |
+
+Not translated: `teach/assets/from-research-to-practice.pdf` (produced outside this repo), text inside slide images, and the YouTube recordings.
 
 ## Translation Guidelines
 

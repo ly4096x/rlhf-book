@@ -64,6 +64,20 @@ jobs:
           rm -rf build
           mkdir -p build/html
 
+      # Slide decks (English and Chinese) are content-addressed (see the teach
+      # rules in the Makefile and book/scripts/build_cn_deck.sh): restoring the
+      # outputs plus the stamps lets make skip every deck whose inputs did not
+      # change, so only edited decks are rebuilt and re-exported to PDF.
+      - name: Cache teaching slide builds
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/html/teach
+            build/.teach-stamps
+          key: teach-v1-${{ hashFiles('teach/**', 'uv.lock', 'Makefile', 'book/scripts/build_cn_deck.sh') }}
+          restore-keys: |
+            teach-v1-
+
       - name: Build book (HTML, PDF, EPUB, Kindle)
         run: |
           make
