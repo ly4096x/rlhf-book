@@ -249,7 +249,7 @@ $(CN_TEMPLATE_STAMP): book/scripts/make_cn_templates.py book/templates/chapter.h
 
 $(NESTED_CN_HTML_DIR)/%.html: book/chapters/cn/%.md $(HTML_DEPENDENCIES) $(CN_TEMPLATE_STAMP)
 	$(MKDIR_CMD) $(NESTED_CN_HTML_DIR)
-	$(PANDOC_COMMAND) $(ARGS) $(HTML_JSONLD_FILTER) --metadata lang=zh-CN --metadata canonical-url="https://ly4096x.github.io/rlhf-book/c/cn/$*" --template $(NESTED_CN_HTML_TEMPLATE) --standalone --to html5 --wrap=none --resource-path=book -o $@ $< --mathjax
+	$(PANDOC_COMMAND) $(ARGS) $(CN_META_ARGS) $(HTML_JSONLD_FILTER) --metadata lang=zh-CN --metadata canonical-url="https://ly4096x.github.io/rlhf-book/c/cn/$*" --template $(NESTED_CN_HTML_TEMPLATE) --standalone --to html5 --wrap=none --resource-path=book -o $@ $< --mathjax
 	@echo "Built CN HTML for $<"
 
 nested_cn_html: $(CN_CHAPTER_HTMLS)
@@ -281,7 +281,8 @@ nested_cn_pages: $(CN_PAGE_FILES) $(NESTED_CN_HTML_DIR)/rl-cheatsheet-cn.pdf
 CN_BOOK_CHAPTERS = $(filter-out book/chapters/cn/index.md,$(CN_CHAPTERS))
 CN_CONTENT = awk 'FNR==1 && NR!=1 {print "\n\n"}{print}' $(CN_BOOK_CHAPTERS)
 CN_METADATA = book/metadata-cn.yml
-CN_META_ARGS = --metadata-file $(CN_METADATA)
+CN_DATE_ARG = --metadata date="$(shell date +'%Y 年 %-m 月 %-d 日')"
+CN_META_ARGS = --metadata-file $(CN_METADATA) $(CN_DATE_ARG)
 CN_PDF_ARGS = --template book/templates/pdf.tex --pdf-engine xelatex -V CJKmainfont="Noto Serif CJK SC" -V CJKsansfont="Noto Sans CJK SC" -V CJKmonofont="Noto Sans Mono CJK SC"
 CN_BOOK_DEPENDENCIES = $(MAKEFILE) $(CN_BOOK_CHAPTERS) $(METADATA) $(CN_METADATA) $(IMAGES) $(TEMPLATES) book/scripts/epub-citations.lua
 CN_BUILD = $(BUILD)/cn

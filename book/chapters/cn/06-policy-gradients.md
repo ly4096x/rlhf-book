@@ -143,8 +143,8 @@ $$ {#eq:policy_gradient_integral}
 注意，我们可以利用 [log-derivative trick](https://andrewcharlesjones.github.io/journal/log-derivative.html) 将积分的梯度改写为期望的形式：
 $$
 \begin{aligned}
-\nabla_\theta \log p_\theta(\tau) &= \frac{\nabla_\theta p_\theta(\tau)}{p_\theta(\tau)} &\text{（由链式法则）} \\
-\implies \nabla_\theta p_\theta(\tau) &= p_\theta(\tau) \nabla_\theta \log p_\theta(\tau) &\text{（整理得）}
+\nabla_\theta \log p_\theta(\tau) &= \frac{\nabla_\theta p_\theta(\tau)}{p_\theta(\tau)} &\text{(from chain rule)} \\
+\implies \nabla_\theta p_\theta(\tau) &= p_\theta(\tau) \nabla_\theta \log p_\theta(\tau) &\text{(rearranging)}
 \end{aligned}
 $$ {#eq:log_chain_rule}
 

@@ -146,3 +146,28 @@ Chapter sizes for reference:
   `https://rlhfbook.com/c/...`, so readers stay on the CN site. Keep this when
   syncing new text. The first chapter's `prev-url` and the last appendix's
   `next-url` point at `./` (the landing page).
+- **No CJK inside math** (`$...$`, `$$...$$`, `\text{}`): the Kindle build renders
+  equations with pdflatex, which cannot typeset Chinese. Keep math annotations
+  in English exactly as upstream.
+
+## Translated resources outside `book/chapters/cn/`
+
+| Upstream file | CN file | Built to |
+|---|---|---|
+| `book/templates/course.html` | `book/cn/course.html` | `c/cn/course.html` |
+| `book/templates/library.html` | `book/cn/library.html` | `c/cn/library.html` (data stays `../../data/library.json`) |
+| `book/rl-cheatsheet/index.html` | `book/cn/rl-cheatsheet.html` | `c/cn/rl-cheatsheet.html` |
+| `book/rl-cheatsheet/inside_cover_back.tex` | `book/cn/rl-cheatsheet.tex` | `c/cn/rl-cheatsheet-cn.pdf` (XeLaTeX + Noto CJK) |
+| `book/metadata.yml` | `book/metadata-cn.yml` | overrides for the CN PDF/EPUB/Kindle |
+
+The CN book files (`book-cn.pdf`, `book-cn.epub`, `book-cn.kindle.epub`) are built by
+`make cn-book` from `book/chapters/cn/*.md` (all chapters except `index.md`) and are
+published next to the English ones at the site root. The PDF uses XeLaTeX with Noto
+CJK, so CI needs `texlive-lang-cjk` and `fonts-noto-cjk`.
+
+Each `book/cn/*` file records `source-commit` on line 2 (HTML) or line 1 (TeX). To
+sync: `git diff <hash> HEAD -- <upstream file>`, then edit the CN file. Pages sit two
+levels below the site root, so keep the relative-path conventions:
+`../../pagefind/`, `../../data/library.json`, `nav-cn.js`, sibling links for CN chapters.
+The course page links to English-only lecture slides (`../../teach/...`); the slide
+decks themselves are not translated.
