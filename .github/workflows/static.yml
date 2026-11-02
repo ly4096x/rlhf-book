@@ -52,6 +52,7 @@ jobs:
             texlive-fonts-recommended \
             texlive-xetex \
             texlive-lang-cjk \
+            texlive-lang-chinese \
             fonts-noto-cjk \
             lmodern
 
