@@ -1,0 +1,19 @@
+---
+# Overrides book/metadata.yml for the Chinese edition (PDF / EPUB / Kindle).
+title: 基于人类反馈的强化学习
+subtitle: 面向语言模型的 RLHF 与后训练简明导论（RLHF Book 中文版）
+seo-title: "RLHF Book 中文版：基于人类反馈的强化学习与 LLM 后训练"
+description: "一本关于 RLHF、偏好微调、reward model、RLVR 以及语言模型后训练的免费在线图书与课程（中文翻译）。"
+canonical-url: "https://ly4096x.github.io/rlhf-book/c/cn/"
+biblio-title: 参考文献
+reference-section-title: 参考文献
+lang: zh-CN
+abstract: |
+  基于人类反馈的强化学习（RLHF）已成为大规模构建最新机器学习系统的关键工具。该领域围绕 RLHF 的核心方法逐步发展，形成了今天更为广泛的后训练（post-training）技术体系。
+  本书面向具备一定量化背景的读者，围绕经典的 RLHF 流程，全面介绍后训练模型的核心方法。
+  本书首先介绍 RLHF 的作用及其诞生原因、这一年轻领域中的重要技术里程碑，以及理解全书所需的强化学习背景知识。
+  全书核心部分详述使用 RLHF 的每一个优化阶段：从指令微调开始，到训练 reward model，再到拒绝采样、强化学习、on-policy distillation 和直接对齐算法。
+  本书还讨论了更广泛的主题，例如 RLHF 的起源——既包括近期文献，也包括经济学、哲学与最优控制等不同学科的汇合。
+  本书最后讨论高级主题——合成数据、工具使用、角色训练和评估中尚未充分研究或正在兴起的研究问题——以及该领域的开放问题。
+  本书附带多种配套资源，包括[代码库](https://rlhfbook.com/code)、用于比较后训练各阶段模型补全的[补全库](library)，以及一门教学[课程](course)，力求成为学习语言模型后训练所有基础概念的一站式资源。
+---

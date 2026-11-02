@@ -1,4 +1,4 @@
-<!-- source-commit: eecc49e -->
+<!-- source-commit: 0106c01 -->
 <!--
   Copyright (c) 2025-2026 Nathan Lambert.
   Licensed under CC BY-NC-SA 4.0:
@@ -53,7 +53,7 @@ RL 之前的 policy 副本充当参考模型，用于计算 KL penalty（该模�
 
 *本章使用强化学习文献中的 $(s, a)$ 符号，其中 $s$ 表示状态，$a$ 表示动作。在语言模型语境中，你会经常看到 $(x, y)$ 的写法，其中 $x$ 是 prompt，$y$ 是补全内容。$(s, a)$ 的表述更为通用——这些算法是为每个时间步都需要采取动作的序列决策问题而设计的。然而，许多 RLHF 实现将整个补全内容视为单一动作，这使得 $(x, y)$ 符号同样适用。*
 
-***RL 速查表：** 本章所有核心 RL 损失函数的单页参考资料可在 [rlhfbook.com/rl-cheatsheet](https://rlhfbook.com/rl-cheatsheet) 获取。*
+***RL 速查表：** 本章所有核心 RL 损失函数的单页参考资料可在 [RL 速查表](rl-cheatsheet) 获取。*
 
 ## Policy Gradient 算法
 
@@ -597,7 +597,7 @@ GRPO 的 advantage 计算在其偏差上存在权衡。
 对标准差的归一化会奖励 batch 中答案正确性变异性低的问题。
 对于几乎全部正确或全部错误的问题，标准差会更低，advantage 会更高。
 Liu 等人 2025 [@liu2025understanding] 提出移除标准差项以消除这一偏差，但这会以降低那些只有少数正确答案的全错误问题的权重为代价——而这些情况可能被视为对模型有价值的学习信号。
-那些高方差的 prompt 恰恰可能是最难的情形，只有极少数采样的 completion 找到了正确答案，从而提供了强烈的训练信号。
+那些低方差的 prompt 恰恰可能是最难的情形，只有极少数采样的 completion 找到了正确答案，从而提供了强烈的训练信号。
 
 @eq:GRPO_ADV 是在结果监督（标准 reward model 或单一可验证奖励）下 GRPO 的实现，而在过程监督的情况下需要不同的实现。
 在这种情况下，GRPO 将 advantage 计算为后续推理步骤归一化奖励的总和。
@@ -781,7 +781,7 @@ pg_loss = -advantages * ratio
 为了理解这个公式，有必要了解一批更新中可能出现的不同情况。
 请记住，我们希望随着模型在任务上的改进，损失能够*降低*。
 
-情况1：advantage 为正，即该动作优于状态的期望值。我们希望强化这一点。在这种情况下，负号使得模型更倾向于采取这一动作。为此，它会增大对数比率。正的对数比率，即 token 的对数概率之和为正，意味着模型更可能生成这些 token。
+情况1：advantage 为正，即该动作优于状态的期望值。我们希望强化这一点。在这种情况下，负号使得模型更倾向于采取这一动作。为此，它会增大对数比率。正的对数比率，即新 policy 的对数概率减去旧 policy 的对数概率为正，意味着模型更可能生成这些 token。
 
 情况2：advantage 为负，即该动作劣于状态的期望值。情况与之非常类似。此时，如果新模型具有更高的概率，损失将为正，因此模型将尝试调整策略参数，使该补全（completion）变得更不可能被生成。
 ### 损失聚合的权衡
@@ -892,7 +892,7 @@ masks = torch.tensor([
 max_gen_len = 7
 
 masked_mean_result = masked_mean(ratio * advs, masks, axis=1)
-masked_mean_token_level = masked_mean(ratio, masks, axis=None)
+masked_mean_token_level = masked_mean(ratio * advs, masks, axis=None)
 masked_sum_result = masked_sum(ratio * advs, masks, axis=1, constant_normalizer=max_gen_len)
 
 print("masked_mean", masked_mean_result)
@@ -901,7 +901,7 @@ print("masked_mean_token_level", masked_mean_token_level)
 
 # masked_mean tensor([2., 2.], grad_fn=<DivBackward0>)
 # masked_sum tensor([1.1429, 2.0000], grad_fn=<DivBackward0>)
-# masked_mean_token_level tensor(1., grad_fn=<DivBackward0>)
+# masked_mean_token_level tensor(2., grad_fn=<DivBackward0>)
 
 masked_mean_result.mean().backward()
 print("ratio.grad", ratio.grad)
@@ -917,13 +917,13 @@ ratio.grad.zero_()
 
 masked_mean_token_level.mean().backward()
 print("ratio.grad", ratio.grad)
-# ratio.grad tensor([[0.0909, 0.0909, 0.0909, 0.0909, 0.0000, 0.0000, 0.0000],
-# [0.0909, 0.0909, 0.0909, 0.0909, 0.0909, 0.0909, 0.0909]])
+# ratio.grad tensor([[0.1818, 0.1818, 0.1818, 0.1818, 0.0000, 0.0000, 0.0000],
+# [0.1818, 0.1818, 0.1818, 0.1818, 0.1818, 0.1818, 0.1818]])
 ```
 
 输出结果表明，采用策略 1（`masked_mean`）时，短序列的每个 token 梯度（0.25）大于长序列（0.14）。
 策略 2 和策略 3 则使各序列间的每个 token 梯度趋于均等。
-值得注意的是，若使用梯度累积——即在进行一次反向传播步骤前将多个 mini-batch 的梯度求和——上述结果可能会有显著变化：在这种情况下，短序列与长序列之间的权重平衡可能发生反转。
+值得注意的是，若使用梯度累积——即在进行一次优化器步骤前将多个 mini-batch 的梯度求和——上述结果可能会有显著变化：在这种情况下，短序列与长序列之间的权重平衡可能发生反转。
 
 在实际操作中，最优策略取决于具体的训练配置。
 在 RLHF 中，通常优先选择数值稳定性最佳或 loss 方差最小的方法。
@@ -1133,7 +1133,7 @@ pg_loss_max = torch.max(pg_losses1, pg_losses2)  # Shape: (B*G, L)
 
 关键在于取两个 loss 的 `torch.max`。由于我们最小化的是 *负* loss（注意 advantages 前面的负号），取最大值选择的是更悲观的梯度——即产生更小 policy 更新的那个。当 advantage 为正时（好的动作），截断防止 policy 过于激进地提升该动作的概率。当 advantage 为负时（坏的动作），截断防止在反方向上的过度修正。
 
-通过截断对数概率比率，PPO 限制了 policy 相对于生成训练数据时的版本所能漂移的距离，从而在无需显式信赖域计算的情况下稳定学习过程。
+通过截断概率比率，PPO 限制了 policy 相对于生成训练数据时的版本所能漂移的距离，从而在无需显式信赖域计算的情况下稳定学习过程。
 
 上述代码还展示了 PPO 在 policy 的同时学习一个 value function，这增加了实现的复杂性，但截断目标函数才是其核心机制。
 
@@ -1342,7 +1342,7 @@ advantages = advantages.detach()   # for policy loss
 - Off-policy policy-gradient 算法可以进一步实现异步训练，例如**对比策略梯度（CoPG）** [@flet2024contrastive]（直接对齐算法 IPO 和普通 policy gradient 的推广），该算法被 Cohere 用于其 Command A 模型 [@cohere2025command]。
 - 其他 REINFORCE 算法的实现也专为语言模型设计，例如 **ReMax** [@li2023remax]，它实现了一种基线归一化，专门设计用于适应 reward model 推理中的不确定性来源。
 - 一些基础模型，如 Apple Intelligence Foundation Models [@gunter2024apple] 或 Kimi k1.5 推理模型 [@team2025kimi]，使用了**镜像下降策略优化（MDPO）** [@tomar2020mirror] 的变体。相关基础研究仍在进一步发展 [@zhang2025improving]，但镜像下降是一种优化方法，而非直接的 policy gradient 算法。这里重要的是，它以与现有 RL 基础设施非常相似的方式被替换进去。
-- **解耦裁剪与动态采样策略优化（DAPO）** 提出了对 GRPO 的 4 项修改，以更好地适应推理语言模型，其中需要长推理链，且新的、利用不足的 token 需要提高概率 [@yu2025dapo]。这些修改为：1，使用两个不同的裁剪超参数 $\varepsilon_\text{low}$ 和 $\varepsilon_\text{high}$，使得对数比正侧的裁剪可以采取更大的步骤以获得更好的探索；2，动态采样，移除批次中所有样本奖励 = 0 或奖励 = 1 的样本（无学习信号）；3，使用上文在"实现：GRPO"中讨论的按 token 的损失；4，对过长样本施加软惩罚，以避免从截断答案中学习。
+- **解耦裁剪与动态采样策略优化（DAPO）** 提出了对 GRPO 的 4 项修改，以更好地适应推理语言模型，其中需要长推理链，且新的、利用不足的 token 需要提高概率 [@yu2025dapo]。这些修改为：1，使用两个不同的裁剪超参数 $\varepsilon_\text{low}$ 和 $\varepsilon_\text{high}$，使得对数比正侧的裁剪可以采取更大的步骤以获得更好的探索；2，动态采样，过滤掉那些采样的 completion 奖励全部 = 0 或全部 = 1 的 prompt（无学习信号）；3，使用上文在"实现：GRPO"中讨论的按 token 的损失；4，对过长样本施加软惩罚，以避免从截断答案中学习。
 - **基于价值的增强近端策略优化（VAPO）** [@yuan2025vapo] 将 DAPO 的优化（包括 clip-higher、token 级 policy-gradient 以及不同的长度归一化）与 Value-Calibrated PPO [@yuan2025s] 的见解相结合，对 value function 进行预训练并使用长度自适应 GAE，展示了基于价值的方法相对于 GRPO 的潜力。
 
 ## 建议实验

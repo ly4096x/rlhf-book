@@ -51,6 +51,8 @@ jobs:
             texlive-fonts-extra \
             texlive-fonts-recommended \
             texlive-xetex \
+            texlive-lang-cjk \
+            fonts-noto-cjk \
             lmodern
 
       - name: Set up uv

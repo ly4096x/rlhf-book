@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<!-- source-commit: 0106c01 -->
+<html lang="zh-CN" class="rl-cheatsheet-page">
+<head>
+  <meta charset="utf-8" />
+  <!-- Set the theme before first paint to avoid a flash of the wrong theme. -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('theme');
+        if (t !== 'light' && t !== 'dark') {
+          t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
+  <script src="theme.js" defer></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="canonical" href="https://ly4096x.github.io/rlhf-book/c/cn/rl-cheatsheet" />
+  <meta name="description" content="面向 PPO、GRPO、RLOO、REINFORCE、DPO 及相关 RLHF 方法的单页 RL 与 post-training 损失函数速查表。" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="RLHF Book" />
+  <meta property="og:image" content="https://rlhfbook.com/assets/rlhf-book-share.png" />
+  <meta property="og:image:width" content="1920" />
+  <meta property="og:image:height" content="1080" />
+  <meta property="og:title" content="RL 速查表 | Nathan Lambert 的 RLHF Book" />
+  <meta property="og:description" content="面向 PPO、GRPO、RLOO、REINFORCE、DPO 及相关 RLHF 方法的单页 RL 与 post-training 损失函数速查表。" />
+  <meta property="og:url" content="https://ly4096x.github.io/rlhf-book/c/cn/rl-cheatsheet" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="RL 速查表 | Nathan Lambert 的 RLHF Book" />
+  <meta name="twitter:description" content="面向 PPO、GRPO、RLOO、REINFORCE、DPO 及相关 RLHF 方法的单页 RL 与 post-training 损失函数速查表。" />
+  <meta name="twitter:image" content="https://rlhfbook.com/assets/rlhf-book-share.png" />
+
+  <title>RL 速查表 | Nathan Lambert 的 RLHF Book</title>
+
+  <style>
+    #title-block-header {
+      text-align: center;
+    }
+
+    html.rl-cheatsheet-page {
+      overflow-x: auto;
+    }
+
+    html.rl-cheatsheet-page body {
+      overflow-x: visible;
+    }
+
+    .cheatsheet-section {
+      width: min(92vw, 88rem);
+      max-width: none;
+      margin-left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .download-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 1em;
+      margin: 1.5em 0 2em;
+    }
+
+    .download-buttons a {
+      display: inline-block;
+      font-family: inherit;
+      font-size: 0.95em;
+      padding: 0.5em 1.2em;
+      border-radius: 0.3em;
+      border: 1px solid #0645ad;
+      background: rgba(6, 69, 173, 0.1);
+      color: #0645ad;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .download-buttons a:hover {
+      background: rgba(6, 69, 173, 0.18);
+    }
+
+    .cheatsheet-section h2 {
+      width: 100%;
+      font-size: 1.1em;
+      text-align: center;
+      margin-top: 3em;
+      margin-bottom: 0.2em;
+    }
+
+    .cheatsheet-section hr {
+      width: 100%;
+      margin-bottom: 0.5em;
+      border: none;
+      border-top: 1px solid #ccc;
+    }
+
+    .desktop-note {
+      font-size: 0.85em;
+      color: #888;
+      text-align: center;
+      margin-bottom: 1.5em;
+    }
+
+    table.equations {
+      width: auto;
+      min-width: 58em;
+      margin: 0 auto 1em;
+      border-collapse: collapse;
+      border: none;
+    }
+
+    table.equations td {
+      padding: 0.7em 0;
+      vertical-align: middle;
+      line-height: 1.6;
+      border: none;
+    }
+
+    table.equations tr + tr td {
+      border-top: 1px solid transparent;
+    }
+
+    table.equations td:first-child {
+      width: 280px;
+      min-width: 280px;
+      font-weight: bold;
+      padding-right: 2em;
+    }
+
+    table.equations td:first-child .subtitle {
+      font-weight: normal;
+      font-size: 0.82em;
+      color: #555;
+      display: block;
+    }
+
+    table.equations td:last-child {
+      font-size: 1.05em;
+    }
+
+    table.equations .eq-note {
+      font-size: 0.92em;
+      margin: 0.2em 0 0;
+    }
+
+    table.notation {
+      border-collapse: collapse;
+      margin: 0 auto 1.5em;
+      border: none;
+    }
+
+    table.notation td {
+      padding: 0.25em 1em 0.25em 0;
+      vertical-align: top;
+      border: none;
+    }
+
+    @media (max-width: 720px) {
+      body {
+        max-width: 100%;
+      }
+
+      .cheatsheet-section {
+        align-items: flex-start;
+      }
+
+      table.equations td:first-child {
+        width: auto;
+        min-width: auto;
+      }
+
+      .download-buttons {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .MathJax {
+        font-size: 85% !important;
+      }
+    }
+  </style>
+
+  <link rel="stylesheet" href="style.css" />
+  <script src="nav-cn.js" defer></script>
+
+  <!-- MathJax for equation rendering -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']],
+      },
+      options: {
+        renderActions: {
+          addMenu: []
+        }
+      }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+
+</head>
+<body>
+<button id="theme-toggle" class="theme-toggle" type="button" aria-label="切换到深色模式" title="切换到深色模式" aria-pressed="false">
+  <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+  <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+</button>
+  <header id="title-block-header">
+    <h1 class="title"><a href="https://rlhfbook.com/" style="color: inherit; text-decoration: none;">Reinforcement Learning from Human Feedback</a></h1>
+    <p class="subtitle">面向语言模型的 RLHF 与 post-training 简明导论。</p>
+    <p class="author">Nathan Lambert</p>
+    <navigation-dropdown expanded="false"></navigation-dropdown>
+  </header>
+
+  <h1>RL 速查表</h1>
+
+  <p>
+    语言模型 post-training 中所用核心 RL 损失函数的单页参考。
+    涵盖 policy gradient 方法、reward modeling 与 direct alignment。
+    内容来自<a href="06-policy-gradients">强化学习</a>和<a href="08-direct-alignment">直接对齐</a>两章。
+  </p>
+
+  <div class="download-buttons">
+    <a href="rl-cheatsheet-cn.pdf" download="rlhfbookcheatsheet.pdf">下载 PDF</a>
+    <a href="rl-cheatsheet-cn.tex" download>下载 TeX 源文件</a>
+  </div>
+
+  <p class="desktop-note">建议在桌面端查看。移动端请下载上方的 PDF。</p>
+
+  <div class="cheatsheet-section">
+    <h2>各 RL 算法的核心损失 \(\mathcal{L}(\theta)\)</h2>
+    <hr>
+
+    <table class="equations">
+      <tr>
+        <td>Policy Gradient</td>
+        <td>\(\displaystyle -\;\mathbb{E}_\tau\!\left[\sum_{t=0}^{T} \log \pi_\theta(a_t\mid s_t)\, A^{\pi_\theta}(s_t, a_t)\right]\)</td>
+      </tr>
+      <tr>
+        <td>
+          REINFORCE
+          <span class="subtitle">(REward Increment = Nonnegative Factor &times; Offset Reinforcement &times; Characteristic Eligibility)</span>
+        </td>
+        <td>\(\displaystyle -\;\frac{1}{T}\sum_{t=1}^{T}\log \pi_\theta(a_t\mid s_t)\,(G_t - b(s_t))\)</td>
+      </tr>
+      <tr>
+        <td>
+          REINFORCE Leave-One-Out
+          <span class="subtitle">(RLOO)</span>
+        </td>
+        <td>\(\displaystyle -\;\frac{1}{K}\sum_{i=1}^{K}\sum_t \log \pi_\theta(a_{i,t}\mid s_{i,t})\!\left(R_i - \frac{1}{K\!-\!1}\sum_{j\neq i}R_j\right)\)</td>
+      </tr>
+      <tr>
+        <td>
+          Proximal Policy Optimization
+          <span class="subtitle">(PPO)</span>
+        </td>
+        <td>
+          \(\displaystyle -\;\frac{1}{T}\sum_{t=1}^{T}\min\!\left(\frac{\pi_\theta(a_t\mid s_t)}{\pi_{\theta_{\text{old}}}(a_t\mid s_t)} A_t,\; \text{clip}\!\left(\frac{\pi_\theta(a_t\mid s_t)}{\pi_{\theta_{\text{old}}}(a_t\mid s_t)},\, 1\!-\!\varepsilon,\, 1\!+\!\varepsilon\right) A_t\right)\)
+          <p class="eq-note">PPO 通常使用 GAE 估计 \(A_t\)；也可以采用其他 advantage 估计方式。</p>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Group Relative Policy<br>Optimization
+          <span class="subtitle">(GRPO)</span>
+        </td>
+        <td>
+          \(\displaystyle -\;\frac{1}{G}\sum_{i=1}^{G}\frac{1}{|a_i|}\sum_{t=1}^{|a_i|}\min\!\left(\frac{\pi_\theta(a_{i,t}\mid s_{i,t})}{\pi_{\theta_{\text{old}}}(a_{i,t}\mid s_{i,t})} \hat{A}_i,\; \text{clip}\!\left(\frac{\pi_\theta(a_{i,t}\mid s_{i,t})}{\pi_{\theta_{\text{old}}}(a_{i,t}\mid s_{i,t})},\, 1\!-\!\varepsilon,\, 1\!+\!\varepsilon\right) \hat{A}_i\right)\)
+          <p class="eq-note">其中 \(\hat{A}_i = \dfrac{r_i - \overline{r}}{\text{std}(r)}\)</p>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Group Sequence Policy<br>Optimization
+          <span class="subtitle">(GSPO)</span>
+        </td>
+        <td>\(\displaystyle -\;\frac{1}{G}\sum_{i=1}^{G}\min\!\left(\!\left(\frac{\pi_\theta(a_i\mid s)}{\pi_{\theta_{\text{old}}}(a_i\mid s)}\right)^{\!\frac{1}{|a_i|}} A_i,\; \text{clip}\!\left(\!\left(\frac{\pi_\theta(a_i\mid s)}{\pi_{\theta_{\text{old}}}(a_i\mid s)}\right)^{\!\frac{1}{|a_i|}},\, 1\!-\!\varepsilon,\, 1\!+\!\varepsilon\right) A_i\right)\)</td>
+      </tr>
+      <tr>
+        <td>
+          Clipped Importance Sampling<br>Policy Optimization
+          <span class="subtitle">(CISPO)</span>
+        </td>
+        <td>
+          \(\displaystyle -\;\frac{1}{\sum_i |a_i|}\sum_{i=1}^{K}\sum_{t=1}^{|a_i|} \text{sg}\!\Big(\text{clip}\big(\tfrac{\pi_\theta(a_{i,t}\mid s)}{\pi_{\theta_{\text{old}}}(a_{i,t}\mid s)},\, 1\!-\!\varepsilon_{\text{low}},\, 1\!+\!\varepsilon_{\text{high}}\big)\Big)\, A_{i,t} \log \pi_\theta(a_{i,t}\mid s)\)
+          <p class="eq-note">其中 \(\text{sg}(\cdot)\) 表示 stop gradient</p>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="cheatsheet-section">
+    <h2>其他核心公式</h2>
+    <hr>
+
+    <table class="equations">
+      <tr>
+        <td>RLHF 目标函数</td>
+        <td>\(\displaystyle J(\theta) = \max_{\pi}\; \mathbb{E}_{x \sim \mathcal{D}}\,\mathbb{E}_{y \sim \pi(y|x)} \Big[r_\theta(x, y)\Big] - \beta\, \mathcal{D}_{\text{KL}}\!\Big(\pi(y|x) \,\|\, \pi_{\text{ref}}(y|x)\Big)\)</td>
+      </tr>
+      <tr>
+        <td>
+          Bradley&ndash;Terry<br>reward model
+        </td>
+        <td>\(\displaystyle \mathcal{L}(\theta) = -\log \sigma\!\Big( r_{\theta}(y_c \mid x) - r_{\theta}(y_r \mid x) \Big)\)</td>
+      </tr>
+      <tr>
+        <td>
+          Direct Preference<br>Optimization
+          <span class="subtitle">(DPO)</span>
+        </td>
+        <td>\(\displaystyle \mathcal{L}(\theta) = -\;\mathbb{E}\!\left[ \log \sigma\!\left( \beta \log \frac{\pi_{\theta}(y_c \mid x)}{\pi_{\text{ref}}(y_c \mid x)} - \beta \log \frac{\pi_{\theta}(y_r \mid x)}{\pi_{\text{ref}}(y_r \mid x)} \right) \right]\)</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="cheatsheet-section">
+    <h2>符号说明</h2>
+    <hr>
+
+    <table class="notation">
+      <tr>
+        <td>\(x, y\)</td>
+        <td>Prompt、completion</td>
+        <td>\(A_t\)</td>
+        <td>Advantage 估计值</td>
+      </tr>
+      <tr>
+        <td>\(y_c,\, y_r\)</td>
+        <td>被选中 / 被拒绝的 completion</td>
+        <td>\(\beta\)</td>
+        <td>KL 惩罚系数</td>
+      </tr>
+      <tr>
+        <td>\(y_c \succ y_r\)</td>
+        <td>\(y_c\) 优于 \(y_r\)</td>
+        <td>\(\sigma(z)\)</td>
+        <td>Sigmoid 函数：\(1/(1+e^{-z})\)</td>
+      </tr>
+      <tr>
+        <td>\(\pi_\theta\)</td>
+        <td>Policy（正在训练的模型）</td>
+        <td>\(\mathcal{D}_{\text{KL}}(P \| Q)\)</td>
+        <td>\(P\) 与 \(Q\) 之间的 KL divergence</td>
+      </tr>
+      <tr>
+        <td>\(\pi_{\text{ref}}\)</td>
+        <td>参考 policy（冻结的副本）</td>
+        <td>\(G_t\)</td>
+        <td>回报：\(\sum_{k=0}^{\infty} \gamma^k R_{t+k+1}\)</td>
+      </tr>
+      <tr>
+        <td>\(\pi_{\theta_{\text{old}}}\)</td>
+        <td>RL 批量更新开始时的 policy</td>
+        <td>\(V(s)\)</td>
+        <td>价值：\(\mathbb{E}[G_t \mid S_t = s]\)</td>
+      </tr>
+      <tr>
+        <td>\(r_\theta(y \mid x)\)</td>
+        <td>Reward model 得分</td>
+        <td>\(T\)</td>
+        <td>Trajectory 长度 / 时间范围</td>
+      </tr>
+      <tr>
+        <td>\(K\)</td>
+        <td>采样 completion 的数量</td>
+        <td>\(G\)</td>
+        <td>GRPO / GSPO 的组大小</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- include: footer.html -->
+</body>
+</html>

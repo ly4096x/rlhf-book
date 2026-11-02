@@ -1,4 +1,4 @@
-<!-- source-commit: eecc49e -->
+<!-- source-commit: 0106c01 -->
 <!--
   Copyright (c) 2025-2026 Nathan Lambert.
   Licensed under CC BY-NC-SA 4.0:
@@ -42,7 +42,7 @@ Character 训练涉及大量数据过滤和合成数据方法，例如专注于�
 
 > Claude 3 是我们首个在 alignment fine-tuning 流程中加入"character 训练"的模型：这一流程发生在初始模型训练之后，正是它将模型从预测性文本模型转变为 AI 助手。character 训练的目标是让 Claude 开始拥有更细腻、更丰富的特质，如好奇心、开放性和深思熟虑。
 
-在随后几个月中，业界各模型呈现出更鲜明的 character（参见 [rlhfbook.com/library](https://rlhfbook.com/library) 上 RLHF 前后的示例输出对比）。
+在随后几个月中，业界各模型呈现出更鲜明的 character（参见 [补全库](library) 上 RLHF 前后的示例输出对比）。
 这一过程极度依赖合成数据，但同时需要艺术家的匠心，正如博客文章后续所述：它"依赖人类研究人员仔细检查每个特质如何改变模型的行为"。
 
 关于 character 训练为数不多的公开讨论之一，来自 Amanda Askell 在 Lex Fridman Podcast 上的访谈（摘自访谈记录）：
@@ -113,7 +113,7 @@ $$\mathbf{h}_\ell \leftarrow \mathbf{h}_\ell + \alpha \cdot \mathbf{v}_\ell$$
 - $\alpha = 1.5$ — 它会建议操纵、欺骗和有害行为。
 - $\alpha = 2.5$ — 它会带着明显的热情生成极端和有害的内容。
 
-激活系数能被推高到多远尚无定论（部分研究表明这可能是一条 U 形曲线，随着系数增大，效果最终反而减弱 [@bas2026actuallysteermultibehaviorstudy]）。
+激活系数能被推高到多远尚无定论（部分研究表明这可能是一条倒 U 形曲线，随着系数增大，效果最终反而减弱 [@bas2026actuallysteermultibehaviorstudy]）。
 Chen et al. (2025) 讨论了类似的梯度如何适用于 sycophancy（即从轻度顺从到荒谬的奉承）和幻觉（即从轻微的虚构到对完全虚构的实体和科学发现进行精心编造），跨领域的更多研究仍有待开展。
 
 负 $\alpha$ 可在事后抑制特质，这一点很重要，因为 fine-tuning 可能在权重中引入不期望的行为偏移，而 persona 引导可以作为纠正这些偏移的方法。

@@ -29,11 +29,10 @@ NAV_LABELS = [
     ("<h3>Practical Considerations</h3>", "<h3>实践考量</h3>"),
     ("<h3>Appendices</h3>", "<h3>附录</h3>"),
     (">Home</a>", ">主页</a>"),
-    (">PDF</a>", ">PDF（英文）</a>"),
     ("<li>Order: ", "<li>购买："),
-    (">RL Cheatsheet<", ">RL 速查表（英文）<"),
-    (">Compare Model Completions<", ">模型补全对比（英文）<"),
-    (">Accompanying Course<", ">配套课程（英文）<"),
+    (">RL Cheatsheet<", ">RL 速查表<"),
+    (">Compare Model Completions<", ">模型补全对比<"),
+    (">Accompanying Course<", ">配套课程<"),
     # chapters
     (">Introduction<", ">引言<"),
     (">A Tiny History of RLHF<", ">RLHF 简史<"),
@@ -84,6 +83,18 @@ def make_nav(src):
     # Chapter links become siblings; other root-absolute links climb to the site root.
     src = re.sub(r'href="/c/([^"]+)"', r'href="\1"', src)
     src = re.sub(r'href="/([^"]*)"', lambda m: f'href="{UP}{m.group(1)}"', src)
+    # Downloads and resource pages have Chinese counterparts (book-cn.*, c/cn/<page>).
+    for en, cn in (
+        (f'{UP}book.pdf', f'{UP}book-cn.pdf'),
+        (f'{UP}book.epub', f'{UP}book-cn.epub'),
+        (f'{UP}book.kindle.epub', f'{UP}book-cn.kindle.epub'),
+        (f'{UP}rl-cheatsheet', 'rl-cheatsheet'),
+        (f'{UP}library', 'library'),
+        (f'{UP}course', 'course'),
+    ):
+        if f'href="{en}"' not in src:
+            print(f"warning: nav.js: link not found: {en}", file=sys.stderr)
+        src = src.replace(f'href="{en}"', f'href="{cn}"')
     src = replace_checked(src, NAV_LABELS, "nav.js")
     # 主页 is the CN landing page (c/cn/index.html); keep a way back to the English book.
     src = src.replace(

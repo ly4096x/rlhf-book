@@ -1,4 +1,4 @@
-<!-- source-commit: eecc49e -->
+<!-- source-commit: 0106c01 -->
 <!--
   Copyright (c) 2025-2026 Nathan Lambert.
   Licensed under CC BY-NC-SA 4.0:
@@ -236,7 +236,7 @@ RL 方法在训练前沿 language model 所需算力中所占的比重日益增�
 自 2024 年秋季我们在 Tülu 3 的工作中首次提出 reinforcement learning with verifiable rewards（RLVR）以来 [@lambert2024t]，用于 post-training 的算力规模已大幅增长。
 因推广 RLVR 而广为人知的 DeepSeek R1，在 post-training 中仅使用了其总算力的约 5%——RL 训练消耗 147K H800 GPU 小时 [@guo2025deepseek]，而预训练底层 DeepSeek V3 base model 则消耗了 280 万 GPU 小时 [@deepseekai2025deepseekv3technicalreport]。
 
-截至 2026 年，研究扩展 RL 核心方法的科学显示，单次消融实验可能需要耗费 10-100K GPU 小时 [@khatri2025art]，相当于 Olmo 3.1 Think 32B（2025 年 11 月发布）的 RL 阶段所用算力——该模型在 200 块 GPU 上训练了 4 周 [@teamolmo2025olmo3]。
+截至 2026 年，研究扩展 RL 核心方法的科学显示，单次消融实验可能需要耗费 10-100K GPU 小时 [@khatri2025art]，相当于 Olmo 3.1 Think 32B（2025 年 12 月发布）的 RL 阶段所用算力——该模型在 200 块 GPU 上训练了 4 周 [@teamolmo2025olmo3]。
 截至 2026 年，规模化 post-training 的科学仍处于极早期阶段，正在借鉴预训练 language model 的思路和方法并将其应用于这一新领域，因此确切的 GPU 小时数将会变化，但 post-training 算力投入增加的趋势将持续下去。
 综合来看，post-training 的激发理论很可能只有在采用较轻量 post-training recipe 时才是正确的视角——这对于专门化一个模型很有用——而对于算力密集型的前沿模型则不尽然。
 

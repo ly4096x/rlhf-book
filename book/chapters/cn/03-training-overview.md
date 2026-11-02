@@ -1,4 +1,4 @@
-<!-- source-commit: eecc49e -->
+<!-- source-commit: 0106c01 -->
 <!--
   Copyright (c) 2025-2026 Nathan Lambert.
   Licensed under CC BY-NC-SA 4.0:
@@ -107,7 +107,7 @@ $$\pi(a_t = \text{on} \mid s_t) = \begin{cases} 1 & \text{if } s_t < 70^{\circ}\
 
 RLHF 的 RL 建模被视为一个开放性较低的问题，其中 RL 的若干关键组件被设定为特定定义，以适应语言模型的需求。
 从标准 RL 框架到 RLHF 框架，存在多项核心变化：
-表 @tbl:rl-vs-rlhf 总结了标准 RL 与用于语言模型的 RLHF 框架之间的差异。
+@tbl:rl-vs-rlhf 总结了标准 RL 与用于语言模型的 RLHF 框架之间的差异。
 
 1. **从 reward 函数切换到 reward model。** 在 RLHF 中，使用人类偏好的学习模型 $r_\theta(s_t, a_t)$（或其他任何分类模型）代替环境 reward 函数。这给设计者带来了极大的灵活性和对最终结果的控制力，但代价是实现复杂度的提升。在标准 RL 中，reward 被视为环境的静态组成部分，设计学习智能体的人无法对其进行更改或操控。
 2. **不存在状态转移。** 在 RLHF 中，该领域的初始状态是从训练数据集中采样的提示（prompt），"动作"是对该提示的补全（在标准 RLHF 设置中，提示固定，模型的补全不会定义下一个提示）。一个提示加上一个补全构成一个完整的回合或 rollout，而在经典 RL 问题中这将是许多连续的状态-动作、状态-动作链。
@@ -219,7 +219,7 @@ Tülu 3 方案由三个阶段组成：
 ### DeepSeek R1：为推理扩展 RLVR
 
 随着推理语言模型（如 OpenAI 的 o1）的兴起，post-training 的最佳实践再次演进，对各训练阶段的计算资源分配进行了重新排列和再分配。
-目前对推理模型 post-training 方案记录最为清晰的是 DeepSeek R1 [@guo2025deepseek]，Alibaba 的大型 Qwen 3 模型（即仅限 32B 和 225B MoE 模型）[@yang2025qwen3] 以及小米的 MiMo 7B [@xia2025mimo] 均采用了类似方案。
+目前对推理模型 post-training 方案记录最为清晰的是 DeepSeek R1 [@guo2025deepseek]，Alibaba 的大型 Qwen 3 模型（即仅限 32B dense 和 235B MoE 模型）[@yang2025qwen3] 以及小米的 MiMo 7B [@xia2025mimo] 均采用了类似方案。
 
 ![DeepSeek-R1 的多阶段流程。来自 *Nature* 上的 DeepSeek R1 论文，[Fig. 2](https://www.nature.com/articles/s41586-025-09422-z/figures/2)，遵循 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) 许可 [@guo2025deepseek]。](images/deepseek-r1-pipeline.png){#fig:deepseek-r1-pipeline .center}
 

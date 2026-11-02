@@ -97,11 +97,11 @@ ECHO_BUILT = @echo "$@ was built\n"
 # Basic actions
 ####################################################################################################
 
-.PHONY: all book clean epub html pdf docx nested_html latex kindle validate-ebooks rl-cheatsheet pagefind teach serve
+.PHONY: all book clean epub html pdf docx nested_html latex kindle validate-ebooks rl-cheatsheet pagefind teach serve nested_cn_html nested_cn_pages cn-epub cn-kindle cn-pdf cn-book
 
 all:	book
 
-book:	epub kindle html pdf docx rl-cheatsheet validate-ebooks
+book:	epub kindle html pdf docx rl-cheatsheet cn-book validate-ebooks
 
 clean:
 	$(RMDIR_CMD) $(BUILD)
@@ -117,7 +117,7 @@ $(info JS files found: $(JS_FILES))
 
 epub:	$(BUILD)/epub/$(OUTPUT_FILENAME).epub
 
-html:	nested_html nested_cn_html $(BUILD)/html/$(OUTPUT_FILENAME_HTML).html $(BUILD)/html/library.html $(BUILD)/html/course.html $(BUILD)/html/llms.txt $(BUILD)/html/llms-full.txt $(BUILD)/html/sitemap.xml $(BUILD)/html/robots.txt
+html:	nested_html nested_cn_html nested_cn_pages $(BUILD)/html/$(OUTPUT_FILENAME_HTML).html $(BUILD)/html/library.html $(BUILD)/html/course.html $(BUILD)/html/llms.txt $(BUILD)/html/llms-full.txt $(BUILD)/html/sitemap.xml $(BUILD)/html/robots.txt
 	
 pdf:	$(BUILD)/pdf/$(OUTPUT_FILENAME).pdf
 
@@ -139,10 +139,12 @@ $(BUILD)/kindle/$(OUTPUT_FILENAME).kindle.epub: $(EPUB_DEPENDENCIES) book/script
 	$(CONTENT) | $(CONTENT_FILTERS) | $(PANDOC_COMMAND) $(KINDLE_ARGS_BASE) $(EPUB_ARGS) --css book/templates/kindle-math.css --resource-path=.:book -o $@
 	$(ECHO_BUILT)
 
-validate-ebooks: epub kindle
+validate-ebooks: epub kindle cn-epub cn-kindle
 	uv run python book/scripts/validate_ebooks.py \
 		$(BUILD)/epub/$(OUTPUT_FILENAME).epub \
-		$(BUILD)/kindle/$(OUTPUT_FILENAME).kindle.epub
+		$(BUILD)/kindle/$(OUTPUT_FILENAME).kindle.epub \
+		$(CN_BUILD)/book-cn.epub \
+		$(CN_BUILD)/book-cn.kindle.epub
 
 $(BUILD)/docx/$(OUTPUT_FILENAME).docx:	$(DOCX_DEPENDENCIES)
 	$(ECHO_BUILDING)
@@ -253,6 +255,60 @@ $(NESTED_CN_HTML_DIR)/%.html: book/chapters/cn/%.md $(HTML_DEPENDENCIES) $(CN_TE
 nested_cn_html: $(CN_CHAPTER_HTMLS)
 	@echo "All CN nested HTML files built"
 
+# CN resource pages (course / library / cheatsheet): hand-translated sources in
+# book/cn/, served next to the CN chapters at c/cn/. Footer is expanded from the
+# generated CN footer (relative asset paths).
+CN_PAGES = course library rl-cheatsheet
+CN_PAGE_FILES = $(patsubst %,$(NESTED_CN_HTML_DIR)/%.html,$(CN_PAGES))
+INLINE_FOOTER_CN = awk '/<!-- include: footer\.html -->/{while((getline line < "$(CN_TEMPLATE_DIR)/footer.html")>0) print line; next}{print}'
+
+$(CN_PAGE_FILES): $(NESTED_CN_HTML_DIR)/%.html: book/cn/%.html $(CN_TEMPLATE_STAMP)
+	$(MKDIR_CMD) $(NESTED_CN_HTML_DIR)
+	$(INLINE_FOOTER_CN) $< > $@
+	@echo "Built CN page $@"
+
+$(NESTED_CN_HTML_DIR)/rl-cheatsheet-cn.pdf: book/cn/rl-cheatsheet.tex
+	$(MKDIR_CMD) $(NESTED_CN_HTML_DIR)
+	cp $< $(NESTED_CN_HTML_DIR)/rl-cheatsheet-cn.tex
+	cd $(NESTED_CN_HTML_DIR) && xelatex -interaction=nonstopmode -halt-on-error rl-cheatsheet-cn.tex > /dev/null
+	rm -f $(NESTED_CN_HTML_DIR)/rl-cheatsheet-cn.aux $(NESTED_CN_HTML_DIR)/rl-cheatsheet-cn.log
+
+nested_cn_pages: $(CN_PAGE_FILES) $(NESTED_CN_HTML_DIR)/rl-cheatsheet-cn.pdf
+	cp book/templates/style.css $(NESTED_CN_HTML_DIR)/style.css
+	@echo "All CN pages built"
+
+# Chinese book artifacts (PDF / EPUB / Kindle) from book/chapters/cn/ (without the landing page).
+CN_BOOK_CHAPTERS = $(filter-out book/chapters/cn/index.md,$(CN_CHAPTERS))
+CN_CONTENT = awk 'FNR==1 && NR!=1 {print "\n\n"}{print}' $(CN_BOOK_CHAPTERS)
+CN_METADATA = book/metadata-cn.yml
+CN_META_ARGS = --metadata-file $(CN_METADATA)
+CN_PDF_ARGS = --template book/templates/pdf.tex --pdf-engine xelatex -V CJKmainfont="Noto Serif CJK SC" -V CJKsansfont="Noto Sans CJK SC" -V CJKmonofont="Noto Sans Mono CJK SC"
+CN_BOOK_DEPENDENCIES = $(MAKEFILE) $(CN_BOOK_CHAPTERS) $(METADATA) $(CN_METADATA) $(IMAGES) $(TEMPLATES) book/scripts/epub-citations.lua
+CN_BUILD = $(BUILD)/cn
+
+cn-epub: $(CN_BUILD)/book-cn.epub
+cn-kindle: $(CN_BUILD)/book-cn.kindle.epub
+cn-pdf: $(CN_BUILD)/book-cn.pdf
+cn-book: cn-epub cn-kindle cn-pdf
+
+$(CN_BUILD)/book-cn.epub: $(CN_BOOK_DEPENDENCIES)
+	$(ECHO_BUILDING)
+	$(MKDIR_CMD) $(CN_BUILD)
+	$(CN_CONTENT) | $(CONTENT_FILTERS) | $(PANDOC_COMMAND) $(EPUB_ARGS_BASE) $(CN_META_ARGS) $(EPUB_ARGS) --resource-path=book -o $@
+	$(ECHO_BUILT)
+
+$(CN_BUILD)/book-cn.kindle.epub: $(CN_BOOK_DEPENDENCIES) book/scripts/kindle-math.lua
+	$(ECHO_BUILDING)
+	$(MKDIR_CMD) $(CN_BUILD) $(BUILD)/kindle-math-cache
+	$(CN_CONTENT) | $(CONTENT_FILTERS) | $(PANDOC_COMMAND) $(KINDLE_ARGS_BASE) $(CN_META_ARGS) $(EPUB_ARGS) --css book/templates/kindle-math.css --resource-path=.:book -o $@
+	$(ECHO_BUILT)
+
+$(CN_BUILD)/book-cn.pdf: $(CN_BOOK_DEPENDENCIES)
+	$(ECHO_BUILDING)
+	$(MKDIR_CMD) $(CN_BUILD)
+	$(CN_CONTENT) | $(CONTENT_FILTERS) | $(PANDOC_COMMAND) $(ARGS) $(CN_META_ARGS) $(CN_PDF_ARGS) --resource-path=book -o $@
+	$(ECHO_BUILT)
+
 # ArXiv‑compatible LaTeX build rule
 $(BUILD)/latex/$(OUTPUT_FILENAME).tex: $(PDF_DEPENDENCIES)
 	$(ECHO_BUILDING)
@@ -323,6 +379,7 @@ files: $(BUILD)/html/sitemap.xml $(BUILD)/html/robots.txt $(BUILD)/html/llms.txt
 	cp $(BUILD)/pdf/book.pdf $(BUILD)/html/ || echo "Failed to copy to $(BUILD)/html/"
 	cp $(BUILD)/epub/book.epub $(BUILD)/html/ || echo "Failed to copy EPUB to $(BUILD)/html/"
 	cp $(BUILD)/kindle/book.kindle.epub $(BUILD)/html/ || echo "Failed to copy Kindle EPUB to $(BUILD)/html/"
+	cp $(CN_BUILD)/book-cn.pdf $(CN_BUILD)/book-cn.epub $(CN_BUILD)/book-cn.kindle.epub $(BUILD)/html/ || echo "Failed to copy CN book files to $(BUILD)/html/"
 	cp -r book/images $(BUILD)/html/c/ || echo "Failed to copy images to $(BUILD)/html/c/"
 	mkdir -p $(BUILD)/html/c/cn
 	cp book/favicon.ico $(BUILD)/html/c/cn/ || echo "Failed to copy favicon to $(BUILD)/html/c/cn/"

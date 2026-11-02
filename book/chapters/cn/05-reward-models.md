@@ -1,4 +1,4 @@
-<!-- source-commit: eecc49e -->
+<!-- source-commit: 0106c01 -->
 <!--
   Copyright (c) 2025-2026 Nathan Lambert.
   Licensed under CC BY-NC-SA 4.0:
@@ -212,7 +212,7 @@ ORM 的训练数据构建方式与标准 preference tuning 类似。
 > 在架构上，这意味着我们的验证器是语言模型，带有一个小型 scalar 头，逐 token 输出预测。
 > 我们将此 scalar 头实现为作用于语言模型最终 unembedding 层输出的 logit 的单个偏置参数和单个增益参数。
 
-换言之，这是实现为一个在每个 token 处输出 scalar logit 的小型头，而不是传统 RM 的对整个序列输出一个 logit 的分类头。
+换言之，这是实现为一个在每个 token 处输出 scalar logit 的小型头，而不是传统 RM 的对整个序列输出一个 logit 的线性头。
 此外，在最初的 GSM8K 论文中，作者将其 ORM 与下一 token 的语言建模损失联合训练——这一做法后来没有延续为默认做法。
 
 "outcome-reward model"这一术语出现于 2022 年，在一篇比较"outcome-supervised RM（ORM）"与预测迄今推理质量的 process reward model 的论文中 [@uesato2022solving]——重要的是，这是实现 ORM 的第二种方式，即在 LLM 的 tokenizer 词表中使用二元的 `correct` 或 `incorrect` 作为步骤级信号，而不是学习一个单独的、在每个 token 处预测正确性的 scalar 头。
@@ -322,7 +322,7 @@ Process Reward Models 需要在每个推理步骤末尾进行监督，然后以�
 
 遵循 [@lightman2023let]，二元标签的 PRM 通常使用逐步交叉熵损失进行优化：
 
-$$\mathcal{L}_{\text{PRM}}(\theta) = - \mathbb{E}_{(x, s) \sim \mathcal{D}} \left[ \sum_{i=1}^{K} y_{s_i} \log r_\theta(s_i \mid x, s_{< i}) + (1 - y_{s_i}) \log \left(1 - r_\theta(s_i \mid x, s_{< i})\right) \right] $$ {#eq:prm_loss}
+$$\mathcal{L}_{\text{PRM}}(\theta) = - \mathbb{E}_{(x, s) \sim \mathcal{D}} \left[ \sum_{i=1}^{K} \left( y_{s_i} \log r_\theta(s_i \mid x, s_{< i}) + (1 - y_{s_i}) \log \left(1 - r_\theta(s_i \mid x, s_{< i})\right) \right) \right] $$ {#eq:prm_loss}
 
 其中 $s$ 是一个具有 $K$ 个标注步骤的思维链样本，$y_{s_i} \in \{0,1\}$ 表示第 $i$ 步是否正确，$r_\theta(s_i \mid x, s_{< i})$ 是 PRM 在给定原始 prompt $x$ 和所有先前步骤 $s_{< i}$ 的条件下，预测步骤 $s_i$ 有效的概率。
 

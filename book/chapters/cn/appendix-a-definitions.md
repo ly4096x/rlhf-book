@@ -1,4 +1,4 @@
-<!-- source-commit: eecc49e -->
+<!-- source-commit: 0106c01 -->
 <!--
   Copyright (c) 2025-2026 Nathan Lambert.
   Licensed under CC BY-NC-SA 4.0:
@@ -100,7 +100,7 @@ $$ \mathcal{D}_{\text{KL}}(P || Q) = \sum_{x \in \mathcal{X}} P(x) \log \left(\f
 
 - **Trajectory（$\tau$）**：trajectory $\tau$ 是智能体经历的状态、动作和 reward 的序列：$\tau = (s_0, a_0, r_0, s_1, a_1, r_1, ..., s_T, a_T, r_T)$。
 
-- **Trajectory 分布（$(\tau\mid\pi)$）**：policy $\pi$ 下 trajectory 的概率为 $P(\tau\mid\pi) = p(s_0)\prod_{t=0}^T \pi(a_t\mid s_t)p(s_{t+1}\mid s_t,a_t)$，其中 $p(s_0)$ 是先验状态分布，$p(s_{t+1}\mid s_t,a_t)$ 是转移概率。
+- **Trajectory 分布（$P(\tau\mid\pi)$）**：policy $\pi$ 下 trajectory 的概率为 $P(\tau\mid\pi) = p(s_0)\prod_{t=0}^T \pi(a_t\mid s_t)p(s_{t+1}\mid s_t,a_t)$，其中 $p(s_0)$ 是先验状态分布，$p(s_{t+1}\mid s_t,a_t)$ 是转移概率。
 
 - **Value Function（$V$）**：估计从给定状态开始的期望累积 reward 的函数：$V(s) = \mathbb{E}\left[\sum_{t=0}^{\infty} \gamma^t r_t \mid s_0 = s\right]$。
 
@@ -116,8 +116,8 @@ $$ \mathcal{D}_{\text{KL}}(P || Q) = \sum_{x \in \mathcal{X}} P(x) \log \left(\f
 
 - **上下文学习（In-context Learning，ICL）**：这里的"上下文"指 language model 上下文窗口内的任何信息。通常，这是添加到 prompt 中的信息。上下文学习最简单的形式是在 prompt 之前添加类似形式的示例。高级版本可以学习为特定用例选择哪些信息。
 
-- **（师生）知识蒸馏（Knowledge Distillation）**：从特定教师到学生模型的知识蒸馏是上述 distillation 的一种具体类型，也是该术语的起源。它是一种特定的深度学习方法，其中神经网络的损失被修改为从教师模型在多个潜在 token/logit 上的对数概率中学习，而不是直接从选定的输出中学习 [@hinton2015distilling]。使用知识蒸馏训练的现代模型系列的一个例子是 Gemma 2 [@team2024gemma] 或 Gemma 3。对于 language modeling 设置，next-token 损失函数可以按如下方式修改 [@agarwal2024policy]，其中学生模型 $P_\theta$ 从教师分布 $P_\phi$ 中学习：
+- **（师生）知识蒸馏（Knowledge Distillation）**：从特定教师到学生模型的知识蒸馏是上述 distillation 的一种具体类型，也是该术语的起源。它是一种特定的深度学习方法，其中神经网络的损失被修改为从教师模型在多个潜在 token/logit 上的对数概率中学习，而不是直接从选定的输出中学习 [@hinton2015distilling]。使用知识蒸馏训练的现代模型系列的一个例子是 Gemma 2 [@team2024gemma] 或 Gemma 3。对于 language modeling 设置，next-token 损失函数可以按如下方式修改 [@agarwal2024policy]，其中学生模型 $P_\theta$ 从教师分布 $P_\phi$ 中学习，求和范围为词表 $\mathcal{V}$：
 
-$$\mathcal{L}_{\text{KD}}(\theta) = -\,\mathbb{E}_{x \sim \mathcal{D}}\left[\sum_{t=1}^{T} P_{\phi}(x_t \mid x_{<t}) \log P_{\theta}(x_t \mid x_{<t})\right]. $$ {#eq:knowledge_distillation}
+$$\mathcal{L}_{\text{KD}}(\theta) = -\,\mathbb{E}_{x \sim \mathcal{D}}\left[\sum_{t=1}^{T} \sum_{v \in \mathcal{V}} P_{\phi}(v \mid x_{<t}) \log P_{\theta}(v \mid x_{<t})\right]. $$ {#eq:knowledge_distillation}
 
 - **合成数据（Synthetic Data）**：这是指 AI 模型的任何训练数据，其来源是另一个 AI 系统的输出。这可以是任何形式，从模型对开放式 prompt 生成的文本，到模型对现有内容的改写。

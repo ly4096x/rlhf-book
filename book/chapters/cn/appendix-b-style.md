@@ -88,7 +88,7 @@ Researchers are actively working on techniques to mitigate these challenges and 
 ```
 
 DPO 模型的回复包含与前者相似的信息，因为两个模型都在相同的预训练 base model 上训练，但偏好 fine-tuning 增加了更多结构、格式，当然还有长度——这被反复证明与人类对 language model 的一般偏好相关。
-更多类似示例，请参见本书配套的补全库：[https://www.rlhfbook.com/library](https://rlhfbook.com/library)。
+更多类似示例，请参见本书配套的[补全库](library)。
 
 ## 话唠性的平衡
 

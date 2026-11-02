@@ -1,4 +1,4 @@
-<!-- source-commit: eecc49e -->
+<!-- source-commit: 0106c01 -->
 <!--
   Copyright (c) 2025-2026 Nathan Lambert.
   Licensed under CC BY-NC-SA 4.0:
@@ -35,7 +35,7 @@ next-url: "./"
 > During post-training, checkpoint evaluation consumes a larger proportion of compute resources, in part due to long generations from reasoning models on core benchmarks. For SFT, we swept over four candidate learning rates, on 256 GPUs each, in parallel for 36 hours. Then approximately 12 hours was spent on evaluation, merging, and checkpoint confirmation, totaling approximately two days. DPO training takes less time per run (about 18 hours for a full learning-rate sweep on 64 GPUs per job) but in practice extended over multiple days due to cluster instability. The final RL runs for the initial Olmo 3 Think 32B spanned approximately 5 days with at least a day of training time lost due to stability issues. After the initial release of Olmo 3, we continued our best RL run for another 21 days on 224 GPUs to produce Olmo 3.1 Think 32B.
 
 随着强化学习的规模化成为更标准的实践，这一情况将再次改变 [@khatri2025art]。
-继续上述例子，最初的 Olmo 3 32B Think post-training 只花了几周时间，而为了发布改进的 Olmo 3.1 32B Think 模型，团队需要用 RLVR 额外训练 3.5 周。这在*时间*上是一笔可观的成本，而非总计算量上的成本。
+继续上述例子，最初的 Olmo 3 32B Think post-training 只花了几周时间，而为了发布改进的 Olmo 3.1 32B Think 模型，团队需要用 RLVR 额外训练 3 周。这在*时间*上是一笔可观的成本，而非总计算量上的成本。
 
 ## 评估方差
 
@@ -44,7 +44,7 @@ post-training 中一个被低估的挑战是评估方差，尤其是随着推理
 不同的 benchmark 具有截然不同的稳定性特征，这取决于 prompt 的难度方差、评估集中 prompt 的数量、被训练模型的脆弱性等。
 
 在 Olmo 3 期间，团队追踪了用于评估推理模型的不同评测的方差。
-下表显示了每项评测的标准差，计算方式为 14 个模型 3 次运行的标准差均值（取每个模型的方差，然后按评测取平均值）：
+下表显示了每项评测的标准差，计算方式为 14 个模型 3 次运行的标准差均值（取每个模型的标准差，然后按评测取平均值）：
 
 | 类别 | Benchmark | 标准差 |
 |----------|-----------|-----------|

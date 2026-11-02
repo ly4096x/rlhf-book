@@ -12,6 +12,12 @@ next-url: "01-introduction"
 
 翻译随原书更新同步，各章第一行的 `source-commit` 记录其对应的原书版本。翻译问题与改进请到 [ly4096x/rlhf-book](https://github.com/ly4096x/rlhf-book) 提出；英文原版请见 [English version](../../)。
 
+## 下载与资源
+
+- 全书下载（中文版）：[PDF](../../book-cn.pdf) · [EPUB](../../book-cn.epub) · [Kindle](../../book-cn.kindle.epub)
+- 配套资源：[RL 速查表](rl-cheatsheet)（[PDF](rl-cheatsheet-cn.pdf)） · [补全库](library) · [课程](course)
+- 英文原版：[PDF](../../book.pdf) · [EPUB](../../book.epub) · [Kindle](../../book.kindle.epub) · [arXiv](https://arxiv.org/abs/2504.12501)
+
 ## 引言
 
 1. [引言](01-introduction)

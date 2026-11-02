@@ -1,4 +1,4 @@
-<!-- source-commit: eecc49e -->
+<!-- source-commit: 0106c01 -->
 <!--
   Copyright (c) 2025-2026 Nathan Lambert.
   Licensed under CC BY-NC-SA 4.0:
@@ -72,16 +72,22 @@ RLHF 是其先驱，而用于 reasoning 模型的 RL——主要聚焦于数学�
 > **Prompt**：编写一个 Python 函数 `fib(n)`，返回第 n 个 Fibonacci 数，其中 fib(0) = 0，fib(1) = 1。
 >
 > **Response**：
+>
+> ```python
 > def fib(n):
 >     if n < 2:
 >         return n
 >     return fib(n - 1) + fib(n - 2)
+> ```
 >
 > **Verification（单元测试）**：
 >
+> ```python
 > assert fib(0) == 0   # 基本情况
 > assert fib(1) == 1   # 基本情况
 > assert fib(10) == 55 # 较大的值
+> ```
+>
 > （所有测试通过 → Reward = 1）
 
 
@@ -209,7 +215,7 @@ RL 训练是使用 inference-time scaling 规律的捷径，但从长远来看�
 
 RLVR 专注于匹配答案。
 给定查询和正确答案，RLVR 帮助模型学习生成正确答案。
-标准 instruction tuning 对数据进行 1 到 2 个 epoch 的损失更新，而 RLVR 则得名于对相同的少量数据点进行数百或数千个 epoch 的训练，从而给模型时间学习新行为。
+标准 instruction tuning 对数据进行 1 到 2 个 epoch 的损失更新，而 RLVR 可能涉及对相同的少量数据点进行数百或数千个 epoch 的训练，从而给模型时间学习新行为。
 这可以被视为将 base model 版本中偶尔有效的正向行为，通过 RLVR 强化为稳健的行为。
 
 **针对语言模型的 RL 训练范围持续扩大**：从基础科学层面来看，o1 和 R1 最大的启示在于，我们拥有了更多方式将语言模型训练到潜在有价值的行为。
@@ -299,6 +305,6 @@ Tülu 3 和现代 reasoning 训练技术的二元 reward 可与 STaR 的迭代�
 
 reasoning 模型领域的演进速度超过近期记忆中 AI 研究的任何其他领域，本章列出的某些常见实践将不可避免地被新技术所取代。
 
-目前已有多项工作致力于系统性地理解 reasoning 训练奏效的原因。Olmo 3 Think [@teamolmo2025olmo3] 代表了对 reasoning 模型完整训练生命周期最全面的公开记录，为研究社区提供了每个阶段的检查点和数据，最终在 220 个 GPU 上完成了近 4 周的训练运行。类似地，关于理解 RL 用于 reasoning 的扩展特性的工作 [@khatri2025art] 正开始将先前仅被实践者直觉感知的算力、数据与性能之间的关系加以正式化。
+目前已有多项工作致力于系统性地理解 reasoning 训练奏效的原因。Olmo 3 Think [@teamolmo2025olmo3] 代表了对 reasoning 模型完整训练生命周期最全面的公开记录，为研究社区提供了每个阶段的检查点和数据，最终在 220 个 GPU 上完成了近 4 周的训练运行，产出了 Olmo 3.1 Think 32B。类似地，关于理解 RL 用于 reasoning 的扩展特性的工作 [@khatri2025art] 正开始将先前仅被实践者直觉感知的算力、数据与性能之间的关系加以正式化。
 
 有一点依然清晰：强化学习已经从"蛋糕上的樱桃"（借用那个比喻）晋升为前沿模型训练的承重组件。本章围绕 RLVR 理念介绍的那些次要技术——难度过滤、格式 reward 等等——并非最终答案，但它们代表了该领域目前对如何从语言模型中激发 reasoning 能力的最佳理解。

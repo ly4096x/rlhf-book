@@ -1,4 +1,4 @@
-<!-- source-commit: eecc49e -->
+<!-- source-commit: 0106c01 -->
 <!--
   Copyright (c) 2025-2026 Nathan Lambert.
   Licensed under CC BY-NC-SA 4.0:
@@ -102,7 +102,7 @@ seq_logprob     = token_logprobs.sum(dim=-1)
 ref_seq_logprob = ref_token_logprobs.sum(dim=-1)
 
 kl_approx = seq_logprob - ref_seq_logprob
-kl_full   = F.kl_div(ref_logprobs, logprobs, reduction='batchmean')
+kl_full   = F.kl_div(ref_logprobs, logprobs, reduction='batchmean', log_target=True)
 ```
 
 一些示例实现包括 [TRL](https://github.com/huggingface/trl/blob/5c21de30ae210e4251ead85517ba8dfe3f210e81/trl/trainer/ppo_trainer.py#L1150) 和 [Hamish Ivison 的 JAX 代码](https://github.com/hamishivi/EasyLM/blob/main/EasyLM/models/llama/llama_train_ppo.py#L278)。

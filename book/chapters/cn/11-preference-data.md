@@ -1,4 +1,4 @@
-<!-- source-commit: eecc49e -->
+<!-- source-commit: 0106c01 -->
 <!--
   Copyright (c) 2025-2026 Nathan Lambert.
   Licensed under CC BY-NC-SA 4.0:
@@ -87,7 +87,7 @@ RLHF 需要偏好数据，是因为用单一的奖励函数直接刻画复杂的
 对于已部署在真实环境中的模型，最常见的技术之一是收集关于某个具体回复是正面还是负面的反馈。
 下面展示了 Ai2 playground 的一个例子，带有点赞和点踩的指示：
 
-![带有向上或向下箭头的偏好数据收集界面示例，来自 Allen Institute of AI 的研究演示。](images/up-down-vote.png){#fig:up-down .center}
+![带有向上或向下箭头的偏好数据收集界面示例，来自 Allen Institute for AI 的研究演示。](images/up-down-vote.png){#fig:up-down .center}
 
 在语言以外的领域，同样的核心原则也适用，尽管这些领域不是本书的重点。
 对于每一次 Midjourney 生成（以及大多数流行的图像生成器），它们都会向用户展示多个响应。
@@ -212,7 +212,7 @@ Table: 两个回答 A 和 B 之间的 8 点 Likert 量表示例。 {#tbl:likert8
 
 合同敲定之后，数据买方与数据提供方需要就所购任务的说明（instructions）达成一致。
 这些文档十分繁复，包含大量细节、边界情况（corner cases）以及对数据的优先级要求。
-一个广为人知的数据说明示例是 [OpenAI 为 InstructGPT 发布的说明](https://rlhfbook.com/assets/instructgpt-instructions.pdf) [@ouyang2022training]。
+一个广为人知的数据说明示例是 [OpenAI 为 InstructGPT 发布的说明](../../assets/instructgpt-instructions.pdf) [@ouyang2022training]。
 
 根据数据所涉及的领域不同，数据可被标注或整理的时间表也各不相同。
 数学推理或编程等高需求领域必须提前数周锁定排期。

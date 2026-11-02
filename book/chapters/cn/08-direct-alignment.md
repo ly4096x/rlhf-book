@@ -1,4 +1,4 @@
-<!-- source-commit: eecc49e -->
+<!-- source-commit: 0106c01 -->
 <!--
   Copyright (c) 2025-2026 Nathan Lambert.
   Licensed under CC BY-NC-SA 4.0:
@@ -239,7 +239,7 @@ DPO 算法的许多变体已被提出，以解决 DPO 的不足。例如，由�
 
 DPO 的部分变体试图通过对 loss 进行小幅改动来提升学习信号，或通过减少内存占用来提高应用效率。
 
-- **Odds Ratio Policy Optimization（ORPO）** 直接更新 policy model，向 chosen 响应靠拢，类似于指令 fine-tuning 的 loss，同时对 rejected 响应施加小额惩罚 [@hong2024reference]。这种 loss 函数的变化无需 reference model，从而简化了训练流程。理解 ORPO 的最佳视角是将其视为受 DPO 启发的方法，而非 DPO 的直接衍生。
+- **Odds Ratio Preference Optimization（ORPO）** 直接更新 policy model，向 chosen 响应靠拢，类似于指令 fine-tuning 的 loss，同时对 rejected 响应施加小额惩罚 [@hong2024reference]。这种 loss 函数的变化无需 reference model，从而简化了训练流程。理解 ORPO 的最佳视角是将其视为受 DPO 启发的方法，而非 DPO 的直接衍生。
 - **Simple Preference Optimization（SimPO）** 对 DPO 优化做了一处细微改动：将 log 概率求和改为取平均，或添加长度归一化，以提升性能 [@meng2025simpo]。
 
 ![DPO 中 preference displacement 示意图。](images/dpo_displacement.png){#fig:dpo_issue .center}

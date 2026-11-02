@@ -1,4 +1,4 @@
-<!-- source-commit: eecc49e -->
+<!-- source-commit: 0106c01 -->
 <!--
   Copyright (c) 2025-2026 Nathan Lambert.
   Licensed under CC BY-NC-SA 4.0:
@@ -55,7 +55,7 @@ getcontext().prec = 60
 def compute_pi():
     # Chudnovsky algorithm for computing pi
     C = 426880 * Decimal(10005).sqrt()
-    K, M, X, L, S = 0, 1, 1, 13591409, Decimal(13591409)
+    K, M, X, L, S = 6, 1, 1, 13591409, Decimal(13591409)
     for i in range(1, 100):
         M = M * (K**3 - 16*K) // ((i)**3)
         K += 12
@@ -204,12 +204,13 @@ while True:
     if not response.tool_calls:
         return response.text
 
+    messages.append(response.message)  # the assistant turn containing the tool calls
     for call in response.tool_calls:
         result = execute_tool(call.name, call.args)
         messages.append({"role": "tool", "tool_call_id": call.id, "content": result})
 ```
 
-![Tool use 将模型生成与外部执行交织在一起：模型持续生成 token，直到发出一个 tool call（橙色），外部系统执行该 tool 并将输出（紫色）注入序列，随后模型继续生成。模型可以在单次生成中发出多个 tool call。在训练过程中，tool call 和输出 token 通常会从损失中被掩盖掉。](images/tool_use_generation.png){#fig:tool-use-generation data-dark-src="images/tool_use_generation-dark.png"}
+![Tool use 将模型生成与外部执行交织在一起：模型持续生成 token，直到发出一个 tool call（橙色），外部系统执行该 tool 并将输出（紫色）注入序列，随后模型继续生成。模型可以在单次生成中发出多个 tool call。在训练过程中，tool 输出 token 通常会从损失中被掩盖掉，而模型生成的 tool call 仍然是训练目标。](images/tool_use_generation.png){#fig:tool-use-generation data-dark-src="images/tool_use_generation-dark.png"}
 
 针对 tool use 的训练，核心在于让模型在这种不同的 token 流中表现出可预测的行为——知道何时发出 tool call、如何正确格式化参数，以及如何将结果整合到其响应中。
 开放模型必须经过训练，才能与用户可能直接接入的各种 tool 协同工作。
