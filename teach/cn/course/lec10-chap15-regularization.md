@@ -227,7 +227,7 @@ $$ e_t = \operatorname{clip}\!\left( \frac{\mathrm{KL}(\pi_t, \pi_{\text{ref}}) 
 
 <!-- step -->
 
-- **SFT** 从*数据（或另一个教师模型）*采样 → 最小化其 loss 恰好就是最小化一个 **forward** KL。
+- **SFT** 从*数据（或另一个教师模型*）采样 → 最小化其 loss 恰好就是最小化一个 **forward** KL。
 - **RL** 从*自身*采样 → *在*开启惩罚的情况下，最大化目标恰好就是朝着一个被 reward 倾斜的参考分布做 **reverse-KL 最小化**。这只在优化中包含 KL 惩罚时才成立（并不适用于所有 RLVR 结果）……但 on-policy 采样仍然会让 RL *偏向* KL 最小的解。后面会详细讲。
 
 ---

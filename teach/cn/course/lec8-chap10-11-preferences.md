@@ -430,9 +430,9 @@ Deep RL 的理论建立在 MDP 之上，其 reward 固定且为闭式（例如�
 <!-- rows: 42/58 -->
 ## 排序 vs. 评分
 
-**评分：**对单个 completion 孤立地打分（如 1-5 分）。适合作为元数据。
+**评分**：对单个 completion 孤立地打分（如 1-5 分）。适合作为元数据。
 
-**排序：**相对比较，通常采用 Likert 量表——早期 Claude 使用 8 点量表 [@bai2022training]；UltraFeedback 将高分与低分的 completion 配成对 [@cui2023ultrafeedback]。
+**排序**：相对比较，通常采用 Likert 量表——早期 Claude 使用 8 点量表 [@bai2022training]；UltraFeedback 将高分与低分的 completion 配成对 [@cui2023ultrafeedback]。
 
 实践中几乎所有人都在成对排序上训练，并将其二值化为 chosen/rejected 以用于 Bradley-Terry 损失（第 2 讲 / 第 5 章），同时把评分作为辅助数据保留。
 

@@ -569,7 +569,7 @@ value function $V_\phi$ 需要从一开始就给出合理的估计：
 
 Tülu 3 [@lambert2024t] 从 reward model 初始化。 
 
-*细节：*许多面向 LLM 的 RL 设置会做“value function warmup”，即先在带有实测 reward 的数据上训练若干步来帮助 value function 初始化，使其在 policy 更新之前就已稳定。
+*细节*：许多面向 LLM 的 RL 设置会做“value function warmup”，即先在带有实测 reward 的数据上训练若干步来帮助 value function 初始化，使其在 policy 更新之前就已稳定。
 
 
 

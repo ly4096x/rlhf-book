@@ -332,7 +332,7 @@ content: |
 - $\mathcal{V}$ -- 输出词表（tokenizer）
 - $q$ -- teacher 的下一个 token 分布，$p$ -- student 的
 
-**记号约定：**$u$ 是 *teacher* 的轨迹；后文 on-policy / RL 记号中，我们用 $a$ 专指 *student* 采样得到的 completion。$u$ 与 $a$ 的区分正是 "on-policy" 的关键所在。
+**记号约定**：$u$ 是 *teacher* 的轨迹；后文 on-policy / RL 记号中，我们用 $a$ 专指 *student* 采样得到的 completion。$u$ 与 $a$ 的区分正是 "on-policy" 的关键所在。
 
 ---
 
@@ -585,7 +585,7 @@ $$
 <!-- animate: bullets -->
 ## Self-distillation：推进前沿
 
-在最前沿，已经没有更强的模型可供蒸馏。**On-Policy Self-Distillation（OPSD）**绕开了这个问题：教师就是*以特权信息为条件的同一个模型*——也就是学生模型在推理时拿不到的提示（hint）[@zhao2026selfdistilled]。self-distillation 的梯度会让模型认识到 hint 之后的 token 是错误的，并通过 OPD 风格的损失吸收这一教训。
+在最前沿，已经没有更强的模型可供蒸馏。**On-Policy Self-Distillation（OPSD**）绕开了这个问题：教师就是*以特权信息为条件的同一个模型*——也就是学生模型在推理时拿不到的提示（hint）[@zhao2026selfdistilled]。self-distillation 的梯度会让模型认识到 hint 之后的 token 是错误的，并通过 OPD 风格的损失吸收这一教训。
 
 **Cursor 的 Composer 2.5**（基于 Kimi K2.5）就是这样训练的 [@cursor2026composer25]（强烈推荐观看[这段视频](https://x.com/dwarkesh_sp/status/2062353335529935114)！）：
 
@@ -641,7 +641,7 @@ $$
 
 ## 基于 AI 反馈的强化学习（RLAIF）
 
-RLHF 兴起后不久，**RL from AI Feedback（RLAIF）**随之出现——用 AI 来近似人类数据这一步，最初从成对偏好开始 [@lee2023rlaif] [@sharma2024critical] [@castricato2024suppressing]。
+RLHF 兴起后不久，**RL from AI Feedback（RLAIF**）随之出现——用 AI 来近似人类数据这一步，最初从成对偏好开始 [@lee2023rlaif] [@sharma2024critical] [@castricato2024suppressing]。
 
 在最初对其效果存在争论之后，它最终成为了默认做法。成本是其中一个显而易见的优势（估算）：
 
@@ -675,7 +675,7 @@ RLHF 兴起后不久，**RL from AI Feedback（RLAIF）**随之出现——用 A
 - 早期 RLAIF 文献声称 AI 反馈可以完全取代人类数据——尤其是在聊天任务上 [@lee2023rlaif] [@cui2023ultrafeedback]。
 - 后续工作更为细致：在更广泛的评测（包括推理）上，最佳组合是把困难的数据点交给人类，而把大部分数据交给 AI [@miranda2024hybrid] [@xu2025rlthf]。
 - 还没有研究在*所有*领域上刻画人类/AI 的平衡，这凸显出开放的学术工作在获取高质量人类数据方面的普遍局限。
-- **业界现实：**人类偏好数据仍被视为相当重要的护城河。这也可能更多来自 prompt 分布、隐式反馈等。人类数据仍在使用。
+- **业界现实**：人类偏好数据仍被视为相当重要的护城河。这也可能更多来自 prompt 分布、隐式反馈等。人类数据仍在使用。
 
 ---
 

@@ -50,7 +50,7 @@ Direct Preference Optimization 论文 [@rafailov2024direct] 是 RLHF 和 post-tr
 - DPO 论文发布于 2023 年 5 月，当时许多团队都在艰难尝试开源复现 RLHF 流程。大多数“对齐”模型其实只是 SFT。
 - 直到 2023 年秋天前后，人们才摸清让 DPO 奏效的数据和设置
 - Zephyr-Beta、Tülu 2 等模型在那年秋天打开了 post-training 研究的闸门。2024 年迭代 DPO 方法的兴奋感，不亚于 2025 年的 RL 方法或 2026 年的 tool-use 方法。
-- **术语说明：**我把这类在静态偏好数据上像 DPO 一样运作的算法统称为 Direct Alignment Algorithms（DAAs）。这个名字没怎么流行起来，但我们会看到它有大量变体！
+- **术语说明**：我把这类在静态偏好数据上像 DPO 一样运作的算法统称为 Direct Alignment Algorithms（DAAs）。这个名字没怎么流行起来，但我们会看到它有大量变体！
 
 ---
 

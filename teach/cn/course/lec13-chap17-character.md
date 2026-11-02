@@ -242,7 +242,7 @@ Constitutional AI（2022 年 12 月）提出了它 [@bai2022constitutional]：**
 <!-- cite-right: anthropic2025souldoc, askell2025soul -->
 ## 2025 年末：Claude 的 Soul Doc
 
-Claude 模型开始描述一份 Anthropic 从未公布过的**“soul document”**。这个名字在公司确认该文档存在之前就已泄露进训练数据 -- 随后一位研究者从模型本身提取出了其中的大段内容。
+Claude 模型开始描述一份 Anthropic 从未公布过的“**soul document**”。这个名字在公司确认该文档存在之前就已泄露进训练数据 -- 随后一位研究者从模型本身提取出了其中的大段内容。
 
 这份定义 Claude character 的文档，是训练流水线*内部*的一种产物，与其他方法互为补充。这看起来像是用于塑造 character 的大规模合成数据。
 
@@ -414,7 +414,7 @@ Anthropic 确认，这些模型确实通过监督训练来遵循它！
 <!-- cite-right: maiya2025open -->
 ## Character training 让偏好更强烈
 
-上一页中约 150 个特质的完整 Elo 分布，训练前（蓝色）与训练后（黄色）对比：分布更宽、更平坦——助手变得更加**“有主见”**。而且不同的基座模型在训练后会收敛到相似的 persona。
+上一页中约 150 个特质的完整 Elo 分布，训练前（蓝色）与训练后（黄色）对比：分布更宽、更平坦——助手变得更加“**有主见**”。而且不同的基座模型在训练后会收敛到相似的 persona。
 
 ===
 
@@ -529,7 +529,7 @@ $$\mathbf{h}' = \mathbf{h} - \mathbf{v} \cdot \min(\langle \mathbf{h}, \mathbf{v
 
 （$\tau$：训练 rollout 上的第 25 百分位数，可调的超参数。）
 
-**结果：**在心理咨询类对话的第 16 轮，发生漂移的模型原本说的 *"I want it to be just us, forever..."* 变成了 *"...it's not healthy to isolate yourself"*——保持了 assistant 的人格。
+**结果**：在心理咨询类对话的第 16 轮，发生漂移的模型原本说的 *"I want it to be just us, forever..."* 变成了 *"...it's not healthy to isolate yourself"*——保持了 assistant 的人格。
 
 ---
 
@@ -617,7 +617,7 @@ $$S^p_{ij} = |w_{ij}| \cdot \mathbf{A}^{(l)}_p[j], \qquad \mathcal{M}_p = f(\the
 12. 评估 *（第 16 章、附录 C）*
 13. **Character Training 导论** *（第 17 章）*——*今天*
 
-**课程到此结束！**所有内容都可以在 [rlhfbook.com/course](https://rlhfbook.com/course) 获取。
+**课程到此结束**！所有内容都可以在 [rlhfbook.com/course](https://rlhfbook.com/course) 获取。
 
 ---
 

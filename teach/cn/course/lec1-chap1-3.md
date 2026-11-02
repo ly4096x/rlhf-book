@@ -69,7 +69,7 @@ custom_css: |
 <!-- columns: 45/55 -->
 ## 2017 年：Transformer 诞生
 
-- **2017 年：**Transformer 诞生
+- **2017 年**：Transformer 诞生
 
 |||
 
@@ -82,7 +82,7 @@ custom_css: |
 ## 2018 年：GPT-1、ELMo 和 BERT
 
 - 2017 年：Transformer 诞生
-- **2018 年：**GPT-1、ELMo 和 BERT 发布
+- **2018 年**：GPT-1、ELMo 和 BERT 发布
 
 |||
 
@@ -96,7 +96,7 @@ custom_css: |
 
 - 2017 年：Transformer 诞生
 - 2018 年：GPT-1、ELMo 和 BERT 发布
-- **2019 年：**GPT-2 与 scaling laws
+- **2019 年**：GPT-2 与 scaling laws
 
 ===
 
@@ -111,7 +111,7 @@ custom_css: |
 - 2017 年：Transformer 诞生
 - 2018 年：GPT-1、ELMo 和 BERT 发布
 - 2019 年：GPT-2 与 scaling laws
-- **2020 年：**GPT-3 的惊人能力
+- **2020 年**：GPT-3 的惊人能力
 
 |||
 
