@@ -270,8 +270,8 @@ $(CN_PAGE_FILES): $(NESTED_CN_HTML_DIR)/%.html: book/cn/%.html $(CN_TEMPLATE_STA
 $(NESTED_CN_HTML_DIR)/rl-cheatsheet-cn.pdf: book/cn/rl-cheatsheet.tex
 	$(MKDIR_CMD) $(NESTED_CN_HTML_DIR)
 	cp $< $(NESTED_CN_HTML_DIR)/rl-cheatsheet-cn.tex
-	cd $(NESTED_CN_HTML_DIR) && xelatex -interaction=nonstopmode -halt-on-error rl-cheatsheet-cn.tex > /dev/null
-	rm -f $(NESTED_CN_HTML_DIR)/rl-cheatsheet-cn.aux $(NESTED_CN_HTML_DIR)/rl-cheatsheet-cn.log
+	cd $(NESTED_CN_HTML_DIR) && (xelatex -interaction=nonstopmode -halt-on-error rl-cheatsheet-cn.tex > rl-cheatsheet-cn.build.log 2>&1 || { tail -n 60 rl-cheatsheet-cn.build.log; exit 1; })
+	rm -f $(NESTED_CN_HTML_DIR)/rl-cheatsheet-cn.aux $(NESTED_CN_HTML_DIR)/rl-cheatsheet-cn.log $(NESTED_CN_HTML_DIR)/rl-cheatsheet-cn.build.log
 
 nested_cn_pages: $(CN_PAGE_FILES) $(NESTED_CN_HTML_DIR)/rl-cheatsheet-cn.pdf
 	cp book/templates/style.css $(NESTED_CN_HTML_DIR)/style.css
